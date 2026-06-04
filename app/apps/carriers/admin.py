@@ -13,5 +13,6 @@ class CarrierServiceAdmin(admin.ModelAdmin):
 
 @admin.register(ClientCarrierConfig)
 class ClientCarrierConfigAdmin(admin.ModelAdmin):
-    list_display = ('client', 'carrier_service', 'customer_code', 'fuel_levy', 'cubic_conversion', 'tailgate_enabled', 'active')
-    list_filter = ('client', 'active', 'tailgate_enabled')
+    list_display = ('client', 'carrier_service', 'base_status', 'customer_code', 'fuel_levy', 'cubic_conversion', 'tailgate_enabled', 'pallet_enabled', 'carton_enabled', 'active')
+    list_filter = ('client', 'active', 'base_status', 'tailgate_enabled', 'pallet_enabled', 'carton_enabled', 'zone_enabled', 'postcode_zones_enabled')
+    search_fields = ('carrier_service__carrier__code', 'carrier_service__service_code', 'ratecard')

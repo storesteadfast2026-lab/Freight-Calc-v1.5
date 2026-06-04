@@ -17,6 +17,7 @@ def consolidate_lines(lines: list[FreightLine], tailgate: bool) -> ConsolidatedF
     product_weight = Decimal('0')
     product_cubic = Decimal('0')
     freight_type_for_rate = ''
+    max_length_m = Decimal('0')
 
     for line in lines:
         quantity_total += line.quantity
@@ -26,6 +27,8 @@ def consolidate_lines(lines: list[FreightLine], tailgate: bool) -> ConsolidatedF
             pallet_count += line.quantity
         elif line.freight_type == 'C':
             carton_count += line.quantity
+        if line.length_m > max_length_m:
+            max_length_m = line.length_m
         if not freight_type_for_rate and line.freight_type:
             freight_type_for_rate = line.freight_type
 
@@ -40,5 +43,6 @@ def consolidate_lines(lines: list[FreightLine], tailgate: bool) -> ConsolidatedF
         cubic_total_m3=product_cubic + pallet_cubic,
         line_count=len([l for l in lines if l.quantity > 0]),
         tailgate=tailgate if pallet_count > 0 else False,
-        freight_type_for_rate=freight_type_for_rate or 'P',
+        freight_type_for_rate='P' if pallet_count > Decimal('0.99') else 'C',
+        max_length_m=max_length_m,
     )

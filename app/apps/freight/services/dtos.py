@@ -36,6 +36,7 @@ class ConsolidatedFreight:
     line_count: int
     tailgate: bool
     freight_type_for_rate: str
+    max_length_m: Decimal = Decimal('0')
 
 
 @dataclass

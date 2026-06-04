@@ -14,7 +14,11 @@ services:
     build:
       context: .
       dockerfile: docker/django/Dockerfile
-    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+      python manage.py shell -c 'from apps.carriers.models import Carrier; from apps.rates.models import FreightRate; import sys; ok=Carrier.objects.filter(code=\"KTI\").exists() and FreightRate.objects.filter(carrier_service__carrier__code=\"KTI\").exists(); sys.exit(0 if ok else 1)' ||
+      python manage.py import_sth_excel /app/sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx --client STH --replace;
+      python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./app:/app
       - ./sample_data:/app/sample_data

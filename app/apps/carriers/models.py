@@ -36,7 +36,11 @@ class CarrierService(models.Model):
 
 
 class ClientCarrierConfig(models.Model):
-    """Per-client carrier configuration / Equivalente parcial a FuelSurcharge."""
+    """Per-client carrier configuration / Equivalente a filas de FuelSurcharge.
+
+    English: Most fields map to columns in FuelSurcharge G:AD.
+    Español: La mayoría de campos replica columnas de FuelSurcharge G:AD.
+    """
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='carrier_configs')
     carrier_service = models.ForeignKey(CarrierService, on_delete=models.CASCADE)
     customer_code = models.CharField(max_length=30, default='STH')
@@ -46,12 +50,19 @@ class ClientCarrierConfig(models.Model):
     uprate = models.DecimalField(max_digits=10, decimal_places=6, default=Decimal('0'))
     cubic_conversion = models.DecimalField(max_digits=10, decimal_places=3, default=Decimal('0'))
     tailgate_enabled = models.BooleanField(default=False)
+    warehouse_handling_enabled = models.BooleanField(default=False)
+    fixed_handling_charge = models.DecimalField(max_digits=12, decimal_places=4, default=Decimal('0'))
     hand_unload_enabled = models.BooleanField(default=False)
     subzone_enabled = models.BooleanField(default=False)
     area_enabled = models.BooleanField(default=False)
     overlength_enabled = models.BooleanField(default=False)
     pallet_enabled = models.BooleanField(default=True)
     carton_enabled = models.BooleanField(default=True)
+    zone_enabled = models.BooleanField(default=True)
+    postcode_zones_enabled = models.BooleanField(default=False)
+    empty_rate_enabled = models.BooleanField(default=False)
+    base_status = models.CharField(max_length=5, default='L')
+    order_ready_rule = models.CharField(max_length=40, default='GOOD')
     active = models.BooleanField(default=True)
 
     class Meta:
