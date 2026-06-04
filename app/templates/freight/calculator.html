@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>STH Freight Calculator</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<main class="page">
+  <section class="card calculator-card">
+    <div class="calculator-header">
+      <h1>Freight Calculator</h1>
+      <p class="muted">STH / Steadfast Freight Calculator migration</p>
+    </div>
+    <div class="grid calculator-grid">
+      <label>From Address
+        <select id="from_address_id">
+          <option value="">Default / Not selected</option>
+          {% for addr in from_addresses %}<option value="{{ addr.id }}">{{ addr.name }} - {{ addr.suburb }} {{ addr.state }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>To Suburb
+        <input id="suburb_search" placeholder="Type suburb, e.g. Blair Athol" autocomplete="off">
+        <div id="suburb_results" class="dropdown"></div>
+      </label>
+      <label>State <input id="state" readonly></label>
+      <label>Postcode <input id="postcode" readonly></label>
+      <label>Tailgate
+        <select id="tailgate"><option>NO</option><option>YES</option></select>
+      </label>
+      <label>Use Preselected SKU Mode
+        <select id="preselect_sku"><option>YES</option><option>NO</option></select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card products-card">
+    <div class="products-table-wrap">
+    <table id="lines" class="products-table">
+      <thead><tr><th class="col-product">Product</th><th class="col-qty">Qty</th><th class="col-type">Type</th><th class="col-num">L</th><th class="col-num">W</th><th class="col-num">H</th><th class="col-num">Weight</th><th class="col-num">Cubic</th><th class="col-action"></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+    <button onclick="addLine()">Add line</button>
+    <button class="primary" onclick="calculate()">Calculate Freight</button>
+  </section>
+
+  <section class="card">
+    <h2>Results</h2>
+    <div id="error" class="error"></div>
+    <table id="results"><thead><tr><th>Carrier</th><th>Service</th><th>Freight Estimate ex GST</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+<script>
+function debounce(fn, ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
+const suburbInput = document.getElementById('suburb_search');
+const suburbResults = document.getElementById('suburb_results');
+suburbInput.addEventListener('input', debounce(async () => {
+  const q = suburbInput.value;
+  if(q.length < 2){ suburbResults.innerHTML=''; return; }
+  const res = await fetch(`/api/suburbs/?q=${encodeURIComponent(q)}`).then(r=>r.json());
+  suburbResults.innerHTML = res.results.length ? res.results.map(s=>`<button type="button" onclick="pickSuburb('${s.suburb.replaceAll("'","\\'")}','${s.state}','${s.postcode}')">${s.label}</button>`).join('') : '<span class="no-results">No suburbs loaded or no matches found</span>';
+}, 200));
+function pickSuburb(suburb,state,postcode){suburbInput.value=suburb;document.getElementById('state').value=state;document.getElementById('postcode').value=postcode;suburbResults.innerHTML='';}
+function addLine(){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input class="sku" placeholder="Search SKU" oninput="productSearch(this)"><div class="dropdown product_dd"></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len" value="0"></td><td><input class="wid" value="0"></td><td><input class="hei" value="0"></td><td><input class="weight" value="0"></td><td><input class="cubic" value="0"></td><td><button onclick="this.closest('tr').remove()">Remove</button></td>`;
+  document.querySelector('#lines tbody').appendChild(tr);
+}
+async function productSearch(input){
+  const q=input.value; const dd=input.parentElement.querySelector('.product_dd');
+  if(q.length<2){dd.innerHTML='';return;}
+  const res=await fetch(`/api/products/?client=STH&q=${encodeURIComponent(q)}`).then(r=>r.json());
+  dd.innerHTML=res.results.length ? res.results.map(p=>`<button type="button" onclick='pickProduct(this, ${JSON.stringify(p)})'>${p.label}</button>`).join('') : '<span class="no-results">No products loaded or no matches found</span>';
+}
+function pickProduct(btn,p){const tr=btn.closest('tr');tr.querySelector('.sku').value=p.sku;tr.querySelector('.ftype').value=p.freight_type;tr.querySelector('.len').value=p.length_m;tr.querySelector('.wid').value=p.width_m;tr.querySelector('.hei').value=p.height_m;tr.querySelector('.weight').value=p.weight_kg;tr.querySelector('.cubic').value=p.cubic_m3;btn.parentElement.innerHTML='';}
+async function calculate(){
+  const rows=[...document.querySelectorAll('#lines tbody tr')];
+  const lines=rows.map(tr=>({sku:tr.querySelector('.sku').value,quantity:tr.querySelector('.qty').value,freight_type:tr.querySelector('.ftype').value,length_m:tr.querySelector('.len').value,width_m:tr.querySelector('.wid').value,height_m:tr.querySelector('.hei').value,weight_kg:tr.querySelector('.weight').value,cubic_m3:tr.querySelector('.cubic').value}));
+  const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,lines};
+  const resp=await fetch('/api/calculate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},body:JSON.stringify(payload)});
+  const data=await resp.json();
+  document.getElementById('error').textContent=data.error||'';
+  const tbody=document.querySelector('#results tbody');
+  tbody.innerHTML=(data.results||[]).map((r,i)=>`<tr class="${i===0?'best':''}"><td>${r.carrier}</td><td>${r.service}</td><td>$${r.estimate_ex_gst}</td></tr>`).join('');
+}
+function getCookie(name){return document.cookie.split('; ').find(row=>row.startsWith(name+'='))?.split('=')[1];}
+addLine();
+</script>
+</body>
+</html>
