@@ -1,5 +1,22 @@
 ﻿case_id,rank,expected_carrier,expected_service,expected_estimate_ex_gst,validation_status,source,notes
-RANDOM_001,1,TEAMEX,ROAD,268.76,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
-RANDOM_003,1,TEAMEX,ROAD,1500.78,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
-RANDOM_004,1,TEAMTAS,GENERAL,828.03,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
-RANDOM_005,1,TEAMEX,ROAD,2442.11,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_001,1,TEAMEX,ROAD,1037.67,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_002,1,TEAMEX,ROAD,2031.20,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_003,1,KTI,GENERAL,427.67,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_003,2,TEAMEX,ROAD,577.13,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_003,3,TFMX,ROAD,851.00,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_004,1,TEAMEX,ROAD,1529.62,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_004,2,KTI,GENERAL,2264.06,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_004,3,TFMX,ROAD,2675.26,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_005,1,TEAMEX,ROAD,3443.56,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_006,1,COCHRN,ROAD,758.06,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_006,2,TEAMEX,ROAD,1299.11,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_007,1,TEAMEX,ROAD,501.50,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_008,1,TEAMEX,ROAD,4265.24,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_009,1,TEAMTAS,GENERAL,1337.32,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_010,1,TEAMEX,ROAD,2327.40,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_011,1,TEAMEX,ROAD,1208.54,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_013,1,TEAMEX,ROAD,1178.20,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_014,1,TEAMEX,ROAD,348.80,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_014,2,KTI,GENERAL,410.57,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_014,3,TFMX,ROAD,458.85,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_015,1,TFMX,ROAD,274.84,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.

@@ -1,90 +1,25 @@
-# 00 - System Overview
+# System Overview
 
-## Propósito
+The application migrates the STH / Steadfast Freight Calculator from Excel to Django/PostgreSQL.
 
-Migrar la calculadora STH / Steadfast Freight Calculator desde Excel a Django/PostgreSQL manteniendo equivalencia funcional verificable.
+## Excel evidence
 
-El objetivo no es reescribir la lógica de memoria. El objetivo es construir una plataforma web cuya salida pueda comprobarse contra Excel cuando sea necesario.
+The workbook calculation is distributed across:
 
-## Fuente de verdad
+- `Calculator`: user input and final ranked results.
+- `CalcLines`: input consolidation and validation.
+- `BrokerTotals`: carrier/service calculation engine.
+- `FuelSurcharge`: carrier configuration, fuel and status flags.
+- `SUBURBS`: suburb/state/postcode lookup.
+- `SKUs`: product dimensions, weight, cubic and freight type.
+- `ZONES`: carrier/service zone mapping.
+- `RATES`: rate table.
+- `SettingFlags`: lists, messages, tailgate and carrier labels.
 
-La fuente de verdad funcional es el workbook:
+## Web goal
 
-```text
-V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
-```
+Build a responsive, multi-client freight calculator platform where STH is the first client implementation.
 
-La hoja principal de validación visual es:
+## Important boundary
 
-```text
-Calculator
-```
-
-Los outputs visibles que se comparan son:
-
-| Excel | Uso |
-|---|---|
-| `Calculator!O6:O9` | Carrier/rank visible |
-| `Calculator!P6:P9` | Service visible |
-| `Calculator!Q6:Q9` | Estimate ex GST visible |
-| `Calculator!J23` | Total weight visible |
-| `Calculator!J24` | Total cubic visible |
-
-## Hojas relevantes del Excel
-
-| Hoja | Rol |
-|---|---|
-| `Calculator` | Input visible y resultados visibles finales |
-| `CalcLines` | Consolidación interna, validaciones y cubic/peso de rating |
-| `BrokerTotals` | Motor de cálculo por carrier/service |
-| `FuelSurcharge` | Configuración carrier/service, fuel, flags y estados |
-| `SUBURBS` | Suburb/state/postcode |
-| `SKUs` | Productos, dimensiones, peso, cubic y freight type |
-| `ZONES` | Mapeo carrier/service hacia zone/subzone/area |
-| `RATES` | Tabla de tarifas |
-| `SettingFlags` | Flags, tailgate, listas y textos auxiliares |
-
-## Límite importante
-
-`CalcLines` puede usarse para diagnóstico interno, pero **no reemplaza** a `Calculator` como expected output visual.
-
-Ejemplo confirmado:
-
-```text
-Calculator!J24 = cubic visible
-CalcLines!P29 = rating cubic, incluye pallet cubic
-```
-
-Por eso la batería visual compara contra `Calculator!J24` y descuenta el pallet cubic cuando toma datos internos de Django.
-
-## Arquitectura Django
-
-Aplicaciones principales:
-
-- `apps.clients`
-- `apps.carriers`
-- `apps.locations`
-- `apps.products`
-- `apps.rates`
-- `apps.freight`
-- `apps.imports`
-- `apps.audit`
-
-Servicios clave:
-
-- `apps.freight.services.calculator.FreightCalculatorService`
-- `apps.freight.services.consolidator.consolidate_lines`
-- `apps.freight.management.commands.validate_excel_battery`
-- `tools/excel/generate_excel_expected_outputs.py`
-
-## Principio de desarrollo
-
-Todo cambio de cálculo debe tener evidencia:
-
-1. caso Excel;
-2. resultado esperado visible;
-3. resultado Django;
-4. diferencia;
-5. diagnóstico;
-6. corrección;
-7. rerun de batería.
+Login, multi-client administration and FROM address configuration are new web requirements. They are not existing Excel logic.

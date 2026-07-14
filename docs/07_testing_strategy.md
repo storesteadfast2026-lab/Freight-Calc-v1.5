@@ -1,107 +1,75 @@
-# 07 - Testing Strategy
+# Testing Strategy
 
-## Principio central
+Required regression tests against Excel:
 
-Las pruebas de equivalencia son independientes:
+- suburb/state/postcode lookup
+- SKU dimension lookup
+- SKU mode consolidation
+- manual mode consolidation
+- pallet weight addition
+- pallet cubic addition
+- tailgate YES
+- tailgate NO / hand unload
+- zone lookup
+- rate lookup key
+- fuel surcharge
+- final total
+- result ranking
 
-```text
-Casos input -> Excel -> expected outputs visibles
-Casos input -> Django -> actual outputs
-Comparación -> validate_excel_battery
-```
+Each production release must compare Django outputs against known Excel cases.
 
-Excel es la fuente de verdad funcional. Django nunca debe generar sus propios expected outputs.
+## Excel vs Django validation batteries
 
-## Tipos de prueba
+The project uses Excel-generated expected outputs to validate Django independently.
 
-### 1. Unit tests Django
+Current battery types:
 
-Cubren piezas internas:
+| Battery | Purpose | Fixture path | Report path |
+|---|---|---|---|
+| `live_latest` | Stable real 20-case regression battery | `app/apps/freight/fixtures/live_latest/` | `reports/sth_excel_live_comparison_report.csv` |
+| `random_current` | Replaceable random exploratory battery | `app/apps/freight/fixtures/random_current/` | `reports/random_current/sth_excel_random_comparison_report.csv` |
 
-- consolidación de pallets/cartons;
-- pallet weight y pallet cubic;
-- tailgate;
-- weight breaks;
-- funciones pequeñas del cálculo.
-
-Comando típico:
-
-```powershell
-docker compose exec web python manage.py test apps.freight.tests -v 2
-```
-
-### 2. Batería fija `live_latest`
-
-Casos reales conocidos. No debe sobrescribirse sin decisión explícita.
-
-Archivos:
+Current confirmed results:
 
 ```text
-app/apps/freight/fixtures/live_latest/sth_excel_generated_cases.csv
-app/apps/freight/fixtures/live_latest/sth_excel_generated_outputs.csv
-app/apps/freight/fixtures/live_latest/sth_excel_generated_components.csv
-```
-
-Último estado conocido antes de cambios posteriores:
-
-```text
+live_latest real 20-case battery
 Cases run: 20
+Expected output rows loaded: 77
 Report rows: 97
 OK rows: 97
 FAIL rows: 0
+
+random_current 15-case battery
+Cases run: 15
+Expected output rows loaded: 21
+Report rows: 36
+OK rows: 36
+FAIL rows: 0
 ```
 
-Después de cambios en cálculo, debe volver a ejecutarse.
+## Validation rules
 
-### 3. Batería random `random_current`
+- Excel `Calculator` is the visual source of truth for expected ranked outputs.
+- `CalcLines` may be used for diagnosis, but it must not replace `Calculator` as the visible expected output.
+- `Calculator!J24` is visible cubic.
+- `CalcLines!P29` is rating cubic and may include pallet cubic.
+- Expected CSV files must be used with the exact Excel baseline that generated them.
+- Each meaningful calculation fix should be validated with both `live_latest` and at least one random or targeted battery.
 
-Carpeta fija reutilizable. Se sobrescribe en cada corrida.
+## Recommended next battery
 
-Archivos:
+Create a targeted battery for special carrier rules:
 
 ```text
-app/apps/freight/fixtures/random_current/sth_excel_random_cases.csv
-app/apps/freight/fixtures/random_current/sth_excel_random_outputs.csv
-app/apps/freight/fixtures/random_current/sth_excel_random_components.csv
-reports/random_current/sth_excel_random_comparison_report.csv
+targeted_special_rules
 ```
 
-No crear carpetas nuevas por cantidad de casos (`random_5`, `random_20`, etc.) salvo que se quiera archivar evidencia específica. Para trabajo diario, usar siempre `random_current`.
+Priority coverage:
 
-## Qué se compara
-
-| Row type | Qué valida |
-|---|---|
-| `rank_output` | carrier, service, estimate ex GST por rank |
-| `component_totals` | total weight y total cubic visible |
-
-## Regla de cubic
-
-La batería compara contra cubic visible:
-
-```text
-Calculator!J24
-```
-
-Si Django entrega rating cubic interno, la batería debe convertirlo:
-
-```text
-visible_cubic = rating_cubic - pallets × 0.02
-```
-
-## Casos sin carrier
-
-Excel puede generar componentes pero ningún rank visible. En ese caso la batería debe comparar componentes usando `consolidate_lines()` aunque no exista `actual_first` de Django.
-
-Este comportamiento fue corregido con fallback en `validate_excel_battery.py`.
-
-## Definition of Done para un fix de cálculo
-
-Un cambio de cálculo se considera terminado solo si:
-
-1. existe un caso Excel reproducible;
-2. se identifica el expected visible desde `Calculator`;
-3. Django reproduce carrier/service/estimate o se documenta una excepción;
-4. `component_totals` queda OK;
-5. la batería afectada queda con `FAIL rows: 0` o se registra un bug abierto;
-6. se actualizan los Markdown relevantes.
+- `TEAMTAS GENERAL`
+- `TEAMEX` overlength
+- `TFMX ROAD` weight breaks
+- `COCHRN ROAD`
+- `CUST COLLECT`
+- pallet-only, carton-only, and mixed P/C shipments
+- postcodes shared by multiple suburbs

@@ -1,6 +1,16 @@
 ﻿case_id,total_weight_kg,total_cubic_m3,selected_carrier,selected_service,selected_estimate_ex_gst,measured_postcode_from_excel,validation_status,source,notes
-RANDOM_001,437.5,0.612,TEAMEX,ROAD,268.76,2311,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
-RANDOM_002,2331,1.798,,,,6701,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
-RANDOM_003,2265,5.023,TEAMEX,ROAD,1500.78,4311,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
-RANDOM_004,3565,3.701,TEAMTAS,GENERAL,828.03,7304,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
-RANDOM_005,1438,3.141,TEAMEX,ROAD,2442.11,4871,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_001,2497.5,1.696,TEAMEX,ROAD,1037.67,3250,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_002,4747.5,2.492,TEAMEX,ROAD,2031.20,2795,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_003,3204,3.207,KTI,GENERAL,427.67,3976,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_004,4934,2.901,TEAMEX,ROAD,1529.62,2074,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_005,4530,3.3419999999999996,TEAMEX,ROAD,3443.56,2738,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_006,4275,3.958,COCHRN,ROAD,758.06,5253,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_007,832.5,1.696,TEAMEX,ROAD,501.50,3482,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_008,13131.5,20.898,TEAMEX,ROAD,4265.24,3647,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_009,5955.5,4.361,TEAMTAS,GENERAL,1337.32,7184,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_010,3071,4.917999999999999,TEAMEX,ROAD,2327.40,2460,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_011,4837.5,7.879,TEAMEX,ROAD,1208.54,3756,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_012,312,0.205,,,,4875,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_013,2765,4.915,TEAMEX,ROAD,1178.20,3351,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_014,732.5,2.536,TEAMEX,ROAD,348.80,2761,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.
+RANDOM_015,169.5,0.049,TFMX,ROAD,274.84,3666,generated_from_excel_live,Microsoft Excel automation,Totals read from configured Calculator cells.

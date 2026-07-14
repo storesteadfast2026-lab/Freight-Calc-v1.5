@@ -2,35 +2,26 @@
 
 Aplicación Django/PostgreSQL para migrar la lógica de la planilla `V2026.R2_Unlocked_STH_Freight_Calculator.xlsx` hacia una plataforma web multi-cliente.
 
-## Estado actual del proyecto
+## Estado actual validado
 
-Este proyecto usa Excel como fuente de verdad funcional. La estrategia actual es:
+El proyecto usa la planilla Excel como fuente de verdad funcional y compara los resultados calculados por Django contra expected outputs generados automáticamente desde Excel.
 
-1. generar casos de prueba independientes;
-2. ejecutar esos casos en Excel con automatización COM;
-3. leer los resultados visibles desde la hoja `Calculator`;
-4. ejecutar los mismos casos en Django;
-5. comparar Django vs Excel con `validate_excel_battery`.
+Validación actual confirmada:
 
-La regla principal es: **Excel no se valida contra Django; Django se valida contra Excel**.
+```text
+live_latest real 20-case battery: 97 OK / 0 FAIL
+random_current 15-case battery:   36 OK / 0 FAIL
+```
 
-## Estado de validación conocido
+Último hito documentado:
 
-- `live_latest`: batería fija de 20 casos reales generada desde Excel. Último resultado conocido antes de los cambios posteriores: 97 filas OK, 0 FAIL.
-- `random_current`: carpeta fija reutilizable para pruebas random. Se sobrescribe en cada nueva corrida.
-- Correcciones ya incorporadas/documentadas:
-  - escritura de postcode en `Calculator!E7` desde el generador Excel;
-  - comparación visual de cubic contra `Calculator!J24`, no contra `CalcLines!P29`;
-  - fallback de `component_totals` cuando Excel no genera carrier/rank;
-  - resolución de zona priorizando `suburb + state` antes de postcode;
-  - precisión de `FreightRate` a 6 decimales para evitar diferencias KTI;
-  - uso de `random_current` como carpeta fija de pruebas random.
-- Investigación abierta:
-  - `TEAMTAS GENERAL` puede calcularse demasiado alto en Django para ciertos casos TAS. Caso observado: `WEEGENA TAS 7304`, SKU `BRH4443`, qty `2`, Excel `828.03`, Django `663983.07` antes de corregir la fórmula base. Ver `docs/12_validation_findings_log.md`.
+- Corrección de lógica específica para `TEAMTAS GENERAL`.
+- Refresh de `live_latest` desde la planilla base actual.
+- Confirmación de que los CSV expected deben usarse siempre con el Excel baseline que los generó.
 
 ## Ejecutar con Docker en Windows
 
-```powershell
+```bash
 copy .env.example .env
 docker compose up --build
 ```
@@ -44,58 +35,58 @@ http://localhost:8000/admin/
 
 ## Crear superusuario
 
-```powershell
+```bash
 docker compose exec web python manage.py createsuperuser
 ```
 
-## Importar Excel de STH
+## Importar el Excel de STH
 
-```powershell
-docker compose exec web python manage.py import_sth_excel `
-  /app/sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx `
-  --client STH `
-  --replace
+La planilla base oficial para STH debe estar en:
+
+```text
+sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
 ```
 
-## Validación rápida contra Excel
+Importación manual:
 
-Batería real fija:
-
-```powershell
-docker compose exec web python manage.py validate_excel_battery `
-  --cases /app/apps/freight/fixtures/live_latest/sth_excel_generated_cases.csv `
-  --expected /app/apps/freight/fixtures/live_latest/sth_excel_generated_outputs.csv `
-  --components /app/apps/freight/fixtures/live_latest/sth_excel_generated_components.csv `
-  --report /app/reports/sth_excel_live_comparison_report.csv
+```bash
+docker compose exec web python manage.py import_sth_excel /app/sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx --client STH --replace
 ```
 
-Resumen:
+## Validación Excel vs Django
 
-```powershell
-Import-Csv .eports\sth_excel_live_comparison_report.csv |
-  Group-Object row_type,overall_status |
-  Format-Table Count, Name
+Para validar una batería, usar siempre el Excel baseline que generó sus CSV expected.
+
+Ejemplo `live_latest`:
+
+```bash
+docker compose exec web python manage.py validate_excel_battery --import-workbook --workbook /app/sample_data/live_baselines/<STH_LIVE_BASELINE>.xlsx --replace --cases /app/apps/freight/fixtures/live_latest/sth_excel_generated_cases.csv --expected /app/apps/freight/fixtures/live_latest/sth_excel_generated_outputs.csv --components /app/apps/freight/fixtures/live_latest/sth_excel_generated_components.csv --report /app/reports/sth_excel_live_comparison_report.csv
 ```
 
-## Documentación principal
+Ver más en:
+
+```text
+docs/10_excel_django_validation_strategy.md
+docs/11_validation_runbook.md
+docs/12_validation_findings_log.md
+```
+
+## Documentación
 
 Ver carpeta `docs/`.
 
-Lectura recomendada:
+Documentos principales:
 
-1. `docs/00_system_overview.md`
-2. `docs/07_testing_strategy.md`
-3. `docs/10_excel_django_validation_strategy.md`
-4. `docs/11_validation_runbook.md`
-5. `docs/12_validation_findings_log.md`
-6. `docs/13_ai_spec_driven_workflow.md`
+- `docs/02_calculation_flow.md`: flujo de cálculo y reglas especiales por carrier.
+- `docs/07_testing_strategy.md`: estrategia de pruebas.
+- `docs/10_excel_django_validation_strategy.md`: estrategia Excel vs Django.
+- `docs/11_validation_runbook.md`: comandos operativos.
+- `docs/12_validation_findings_log.md`: historial de bugs/hallazgos.
+- `docs/13_ai_spec_driven_workflow.md`: forma de trabajar con IA y spec-driven development.
+- `docs/adr/`: decisiones técnicas permanentes.
 
 ## Autocomplete data
 
-Los campos de suburbios y productos leen desde PostgreSQL. En un volumen Docker limpio, el contenedor importa la planilla de ejemplo después de migraciones si no existen suburbios cargados. Si ya había un volumen antiguo, ejecutar una vez:
+English: The suburb and product autocomplete fields read from PostgreSQL. On a clean Docker volume, the container now imports the sample workbook automatically after migrations if no suburbs exist. If you already had an old database volume, run `docker compose down -v` once so the database is recreated and the import can run.
 
-```powershell
-docker compose down -v
-```
-
-Luego volver a levantar el proyecto e importar la planilla.
+Español: Los campos de autocompletado de suburbios y productos leen datos desde PostgreSQL. En un volumen Docker limpio, el contenedor importa automáticamente la planilla de ejemplo después de las migraciones si no existen suburbios cargados. Si ya tenías un volumen anterior, ejecuta `docker compose down -v` una vez para recrear la base de datos y permitir la importación.

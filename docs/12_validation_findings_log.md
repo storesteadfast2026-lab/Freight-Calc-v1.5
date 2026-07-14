@@ -1,177 +1,114 @@
-# 12 - Validation Findings Log
+# Validation Findings Log
 
-Registro de hallazgos importantes descubiertos por baterías Excel vs Django.
+This log records calculation mismatches, root causes, corrections, and validation results. It is the operational memory for Excel-to-Django parity.
 
-## F001 - Postcode no se escribía en Excel
+## 2026-07-14 - TEAMTAS GENERAL fix and validation baseline refresh
 
-**Síntoma**
+### Summary
 
-```text
-postcode_readback = 3023 para todos los casos random
-```
+A random Excel-vs-Django validation battery detected a real calculation issue for `TEAMTAS GENERAL`.
 
-**Causa**
-
-`generate_excel_expected_outputs.py` escribía `suburb` y `state`, pero no escribía `postcode` en `Calculator!E7`.
-
-**Fix**
-
-```python
-set_cell(ws, args.postcode_cell, clean_text(row.get("postcode")))
-```
-
-**Resultado**
-
-`postcode_written` y `postcode_readback` coinciden.
-
-## F002 - Django resolvía zona por postcode antes que suburb
-
-**Síntoma**
-
-`rank_output FAIL` por carrier/precio incorrecto.
-
-**Casos**
-
-- `YARROWYCK NSW 2358`: Django tomó zona de otro suburb con el mismo postcode.
-- `BALL BAY QLD 4740`: Django tomó zona `MYK1`; Excel usó `MYK2`.
-
-**Causa**
-
-Django buscaba `FreightZone` primero por postcode.
-
-**Fix**
-
-Resolver primero:
+Failing case:
 
 ```text
-suburb + state
-```
-
-y solo después fallback por postcode si corresponde.
-
-**Resultado**
-
-Los `rank_output` de la corrida random corregida pasaron a OK.
-
-## F003 - component_totals fallaba cuando Excel no generaba carrier
-
-**Síntoma**
-
-```text
-Excel generated_output_count = 0
-expected_total_weight_kg existe
-actual_total_weight_kg vacío
-```
-
-**Causa**
-
-La batería obtenía componentes desde el primer resultado/rank de Django. Si no había rank, no había `actual_first`.
-
-**Fix**
-
-Fallback a `consolidate_lines()` dentro de `_compare_components()`.
-
-**Detalle importante**
-
-El fallback debe usar cubic visible:
-
-```text
-visible_cubic = rating_cubic - pallets × 0.02
-```
-
-no `rating_cubic` completo.
-
-**Resultado**
-
-Caso `RANDOM_001` con Excel sin carrier pasó de FAIL a OK.
-
-## F004 - KTI diferencias pequeñas por precisión de rates
-
-**Síntoma**
-
-Diferencias pequeñas de centavos en KTI, por ejemplo `0.26` o `0.05`.
-
-**Causa**
-
-Rates importados con 4 decimales. Excel usaba mayor precisión.
-
-**Fix**
-
-`FreightRate` aumentado a 6 decimales y reimportación del workbook.
-
-**Resultado**
-
-Batería fija de 20 casos llegó a 97 OK / 0 FAIL antes de cambios posteriores.
-
-## F005 - TEAMTAS GENERAL extremadamente alto
-
-**Estado**: abierto.
-
-**Caso**
-
-```text
-case_id: RANDOM_004
-suburb: WEEGENA
-state: TAS
-postcode: 7304
-tailgate: NO
-sku_1: BRH4443
-qty_1: 2
-```
-
-**Excel**
-
-```text
-TEAMTAS GENERAL = 828.03
-```
-
-**Django observado**
-
-```text
-TEAMTAS GENERAL = 663983.07
-rate_lookup_key = TEAMTASGENERALLZ25STHP
-rate_source_row = 4154
-chargeable_weight = 3565
-freight_base = 663983.07
-```
-
-**Rate row 4154**
-
-```text
-carrier = TEAMTAS
-service = GENERAL
-zone = LZ2
-weight_break = 5
-freight_type = P
-minimum_charge = 140.000000
-basic_charge = 1.820000
-per_kg = 186.250000
-fuel = 0
-```
-
-**Diagnóstico parcial**
-
-```text
-Generic formula: basic + per_kg × kg = 663983.07
-Per-tonne candidate: basic + per_kg × kg / 1000 = 665.81
+Case: RANDOM_004
+Destination: WEEGENA TAS 7304
+Product: BRH4443 x 2
 Excel expected: 828.03
-Difference remaining: 162.22
+Django actual before fix: 663983.07
 ```
 
-**Descartado**
+### Root cause
 
-No hay `CarrierTailgateCharge` para `TEAMTAS` y la config muestra:
+Django treated `TEAMTAS GENERAL` as a normal kg-based carrier. That effectively calculated:
 
 ```text
-tailgate_enabled = False
-hand_unload_enabled = False
-overlength_enabled = False
-fuel_levy = 0
-uprate = 0
+rate * kilograms
 ```
 
-**Próximo paso**
+Excel does not calculate `TEAMTAS GENERAL` that way. The workbook uses carrier-specific logic in `BrokerTotals` row 20 based on whole tonne/cubic chargeable units and an additional TEAMTAS fee.
 
-Buscar en el workbook generado dónde aparece `162.22`, `828.03`, `665.81` o una fórmula especial en `BrokerTotals` / `SettingFlags` / `RATES` para TEAMTAS.
+### Resolution
 
-No aplicar un parche incompleto solo con `/1000`, porque dejaría Django en `665.81` y seguiría fallando contra Excel `828.03`.
+`calculator.py` was updated with TEAMTAS-specific logic:
+
+- chargeable units are based on the greater of rating cubic units and actual tonnes
+- chargeable units are rounded up to whole units
+- base freight uses `Basic * rating_units + subsequent + Rate * whole_chargeable_units`
+- an additional TEAMTAS fee is added:
+
+```text
+(pallet_count * 2) + (visible_cubic * 0.6)
+```
+
+### Important baseline finding
+
+After the TEAMTAS fix, `random_current` passed, but `live_latest` initially showed many failures.
+
+This was not a Django calculation regression. The cause was that the existing `live_latest` expected CSV files were not aligned with the current base workbook/baseline.
+
+Rule confirmed:
+
+```text
+Each validation battery must use the Excel baseline that generated its expected CSV files.
+```
+
+Do not mix:
+
+- expected CSV from one baseline
+- PostgreSQL data imported from another baseline
+
+Doing so can produce false failures even when Django calculation logic is correct.
+
+### Final validation results
+
+Real 20-case battery:
+
+```text
+Cases run: 20
+Expected output rows loaded: 77
+Report rows: 97
+OK rows: 97
+FAIL rows: 0
+```
+
+Random 15-case battery:
+
+```text
+Cases run: 15
+Expected output rows loaded: 21
+Report rows: 36
+OK rows: 36
+FAIL rows: 0
+```
+
+### Current status
+
+```text
+TEAMTAS GENERAL: fixed
+live_latest: passing
+random_current: passing
+Excel-Django validation workflow: healthy
+```
+
+## Earlier confirmed findings
+
+### Visible cubic vs rating cubic
+
+`Calculator!J24` is the visible/customer cubic. `CalcLines!P29` can include pallet cubic and is used internally for rating.
+
+Django consolidation includes pallet cubic, so visual comparison may need:
+
+```text
+visible_cubic = rating_cubic - pallet_count * 0.02
+```
+
+### Zone resolution order
+
+Excel behavior requires exact `suburb + state` match before postcode-only fallback. Many Australian suburbs share postcodes.
+
+TEAMEX must not freely fall back to postcode-only aliases when Excel does not rate the carrier that way.
+
+### KTI precision
+
+KTI required higher decimal precision in imported rates. `FreightRate` decimal precision was increased to preserve six decimal places.

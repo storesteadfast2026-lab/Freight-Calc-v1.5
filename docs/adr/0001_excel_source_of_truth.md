@@ -2,21 +2,21 @@
 
 ## Status
 
-Accepted.
+Accepted
 
 ## Context
 
-The Django freight calculator is a migration of an existing Excel workbook. The Excel workbook contains business logic distributed across `Calculator`, `CalcLines`, `BrokerTotals`, `FuelSurcharge`, `ZONES`, `RATES`, `SKUs`, and `SettingFlags`.
+The Django application is a migration of an existing freight calculator workbook. Business rules are embedded across `Calculator`, `CalcLines`, `BrokerTotals`, `RATES`, `ZONES`, `FuelSurcharge`, and `SettingFlags`.
 
 ## Decision
 
-Excel remains the functional source of truth until enough independent production evidence proves the Django implementation.
+The Excel workbook remains the functional source of truth until each rule is explicitly replicated and validated in Django.
 
-Django must be validated against Excel using independent input cases and visible Excel outputs.
+Customer-visible expected ranked outputs must come from `Calculator`.
+
+Internal sheets such as `CalcLines` and `BrokerTotals` may be used for diagnosis and reverse-engineering, but they must not replace `Calculator` as the expected visual output.
 
 ## Consequences
 
-- Expected outputs must come from Excel, not Django.
-- `Calculator` visible cells are the expected source for user-facing outputs.
-- `CalcLines` can be used for internal diagnosis, but not as a replacement for visible expected outputs.
-- Every calculation fix must be backed by an Excel-vs-Django battery run.
+- Every calculation change should be backed by an Excel-vs-Django validation case.
+- Generated expected CSVs must be traceable to the workbook baseline that produced them.

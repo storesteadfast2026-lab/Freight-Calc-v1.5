@@ -1,99 +1,101 @@
-# 10 - Excel vs Django Validation Strategy
+# Excel-Django Validation Strategy
 
-## Objetivo
+## Purpose
 
-Tener una forma repetible de probar Django contra Excel sin depender de pruebas manuales caso por caso.
+The application migrates freight calculation logic from the STH Excel workbook to Django. The validation strategy keeps Excel and Django independent:
 
-La estrategia separa responsabilidades:
+1. Django or CSV fixtures provide input cases.
+2. Excel calculates expected outputs using the official workbook.
+3. Django calculates the same cases using imported PostgreSQL data.
+4. `validate_excel_battery` compares Excel expected outputs against Django actual outputs.
 
-| Etapa | Responsable | Resultado |
+The goal is not simply to make tests pass. The goal is to prove that Django reproduces Excel behavior for each documented scenario.
+
+## Official source of truth
+
+The official base workbook is:
+
+```text
+sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
+```
+
+The customer-visible expected ranked outputs must come from the `Calculator` sheet.
+
+Important distinction:
+
+| Excel area | Meaning | How it is used |
 |---|---|---|
-| Generar inputs | Django / CSV | casos de prueba |
-| Calcular expected | Excel automatizado | outputs esperados visibles |
-| Calcular actual | Django service | outputs reales |
-| Comparar | `validate_excel_battery` | reporte OK/FAIL |
+| `Calculator` | customer-visible inputs and outputs | source of truth for expected ranked outputs |
+| `CalcLines` | internal calculation details | diagnostic support only |
+| `BrokerTotals` | carrier row formulas | source for reverse-engineering carrier logic |
+| `RATES`, `ZONES`, `FuelSurcharge`, `SettingFlags` | imported data / configuration | imported into PostgreSQL |
 
-## Regla de independencia
+## Battery types
 
-Django puede generar inputs random, pero no puede generar expected outputs. Los expected outputs vienen desde Excel.
+### live_latest
 
-## Source of Truth
-
-La comparación de salida usa la hoja `Calculator`:
+Stable 20-case real regression battery.
 
 ```text
-O6:Q9 = ranked outputs
-J23   = total weight
-J24   = visible cubic
-```
-
-`CalcLines` se usa solo para diagnóstico. No se debe usar `CalcLines` para reemplazar expected visual.
-
-## Artefactos principales
-
-### Generador Excel
-
-```text
-tools/excel/generate_excel_expected_outputs.py
-```
-
-Responsabilidades:
-
-- abrir una copia del workbook;
-- escribir inputs en `Calculator`;
-- refrescar/calcular;
-- leer outputs visibles;
-- escribir CSVs expected;
-- generar `manifest.json`;
-- generar `sth_excel_generation_debug.csv`.
-
-### Batería Django
-
-```text
-app/apps/freight/management/commands/validate_excel_battery.py
-```
-
-Responsabilidades:
-
-- leer cases, expected outputs y components;
-- construir `FreightRequest`;
-- ejecutar `FreightCalculatorService`;
-- comparar rank outputs;
-- comparar component totals;
-- generar reporte CSV.
-
-## Carpetas estándar
-
-### Batería fija real
-
-```text
-app/apps/freight/fixtures/live_latest
+app/apps/freight/fixtures/live_latest/
 reports/sth_excel_live_comparison_report.csv
 ```
 
-### Batería random actual
+Current confirmed result:
 
 ```text
-app/apps/freight/fixtures/random_current
-generated_excel_baselines/random_current
-sample_data/live_baselines/random_current
-reports/random_current
+Cases run: 20
+Expected output rows loaded: 77
+Report rows: 97
+OK rows: 97
+FAIL rows: 0
 ```
 
-`random_current` se sobrescribe. Para evidencia histórica, copiar el reporte a un nombre terminado en `_OK.csv` o con fecha.
+### random_current
 
-## Estados aceptados
+Replaceable random exploratory battery. This folder is intentionally reused and overwritten for new random checks.
 
-| Estado | Significado |
-|---|---|
-| `OK rows = total rows`, `FAIL rows = 0` | Equivalencia validada para esa batería |
-| `rank_output FAIL` | carrier/rank/service/precio no coincide |
-| `component_totals FAIL` | peso/cubic no coincide o batería no pudo calcular actual |
-| Excel `generated_output_count = 0` | Excel no mostró carrier/rank para ese caso |
+```text
+app/apps/freight/fixtures/random_current/
+reports/random_current/sth_excel_random_comparison_report.csv
+```
 
-## Buenas prácticas
+Current confirmed 15-case result:
 
-- Guardar siempre `manifest.json` junto al reporte OK.
-- No mezclar baselines: importar a PostgreSQL la misma baseline `.xlsx` usada para generar expected outputs.
-- Si se corrige cálculo, rerun de random y live_latest.
-- Si una prueba random descubre un bug real, convertirla en caso fijo o documentarla en findings.
+```text
+Cases run: 15
+Expected output rows loaded: 21
+Report rows: 36
+OK rows: 36
+FAIL rows: 0
+```
+
+## Baseline pairing rule
+
+Every battery has two inseparable parts:
+
+1. CSV expected files generated from Excel.
+2. Excel baseline workbook imported into PostgreSQL.
+
+They must come from the same generation run.
+
+Do not compare expected CSV files from one baseline against PostgreSQL data imported from another baseline.
+
+## What a report row means
+
+`Report rows` is not the number of cases.
+
+Example:
+
+```text
+20 input cases
+77 ranked carrier output rows
+20 component total rows
+97 report rows total
+```
+
+## Component totals
+
+The battery compares component totals separately from carrier ranked outputs. This matters because Excel may generate no carrier for a case while still showing total weight/cubic components.
+
+When no carrier is generated, Django uses `consolidate_lines()` as a fallback for component comparison.

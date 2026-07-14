@@ -1,130 +1,111 @@
-# 09 - Troubleshooting
+# Troubleshooting
 
 ## relation "clients_client" does not exist
 
-Causa: PostgreSQL partió sin migraciones para las apps del proyecto.
+This error means the PostgreSQL database was started without Django migrations for the project apps.
 
-Solución destructiva para entorno local:
+Fix:
 
-```powershell
+```bash
 docker compose down -v
 docker compose build --no-cache
 docker compose up
 ```
 
-Solución no destructiva:
+If you do not want to remove the database volume, run:
 
-```powershell
+```bash
 docker compose exec web python manage.py migrate --noinput
 ```
 
-## Invalid HTTP_HOST header
+The project now includes initial migrations for all custom apps.
 
-Agregar la IP local a `ALLOWED_HOSTS`, por ejemplo:
+## TEAMEX does not match Excel while STEA, COCHRN, and KTI match
 
-```text
-192.168.1.106
+Symptom example:
+
+- Excel shows `TEAMEX ROAD` around `$216.76`.
+- The application shows `TEAMEX ROAD` around `$197.29`.
+- `STEA`, `COCHRN`, and `KTI` match Excel.
+
+Cause:
+
+The issue is not the fuel table if the other carriers match. The previous application logic used a single global weight-break function for all carriers. Excel uses carrier-specific formulas in `BrokerTotals!AI:AO`.
+
+For the Blair Athol test case with SKU 20772 quantity 5 and SKU 20985 quantity 5, the chargeable weight is 2075 kg. Excel resolves `TEAMEX ROAD` to `WeightBrk = 3`; the old global function resolved it to `WeightBrk = 4`.
+
+Fix included in this version:
+
+- `TEAMEX` now uses the `BrokerTotals` TEAMEX break logic only for `TEAMEX`.
+- `TFMX`, `TEAMTAS`, `MACHIPE`, and `MIPEC` have separate selectors.
+- Carriers without a break formula, such as `STEA`, `COCHRN`, and `KTI`, use blank `WeightBrk`.
+
+After deploying the code change, rebuild/restart the web container:
+
+```bash
+docker compose up -d --build web
 ```
 
-## Excel random muestra postcode viejo `3023`
+Reimporting the Excel workbook is not required for this specific code fix, as long as the current `RATES` data is already imported correctly.
 
-Síntoma:
+## Many false failures after switching validation batteries
+
+Symptom:
 
 ```text
-suburb_written cambia
-state_written cambia
-postcode_readback = 3023 para todos los casos
+Workbook import skipped. Using current PostgreSQL data.
+Cases run: 20
+OK rows: 36
+FAIL rows: 61
 ```
 
-Causa: `generate_excel_expected_outputs.py` escribía `suburb` y `state`, pero no escribía `postcode` en `Calculator!E7`.
+or many carriers fail with small percentage differences even though recent targeted/random tests passed.
+
+Cause:
+
+The expected CSV files and PostgreSQL data are likely from different Excel baselines. For example, running `live_latest` expected CSVs while PostgreSQL is still loaded with `random_current` data can produce false failures.
 
 Fix:
 
-```python
-set_cell(ws, args.postcode_cell, clean_text(row.get("postcode")))
+Import and validate in the same command using the matching workbook:
+
+```bash
+docker compose exec web python manage.py validate_excel_battery --import-workbook --workbook /app/sample_data/live_baselines/<matching-baseline>.xlsx --replace --cases <matching-cases.csv> --expected <matching-outputs.csv> --components <matching-components.csv> --report <report.csv>
 ```
 
-Validación:
-
-```powershell
-Import-Csv .\generated_excel_baselinesandom_current\sth_excel_generation_debug.csv |
-  Select-Object case_id,suburb_written,state_written,postcode_written,postcode_readback |
-  Format-Table -Auto
-```
-
-## rank_output falla por zona incorrecta
-
-Síntoma:
-
-- Excel usa el suburb real.
-- Django usa la primera fila del mismo postcode.
-
-Ejemplos observados:
-
-- `YARROWYCK NSW 2358`: Django tomaba otra localidad por postcode y zona `BNE4`; Excel usa `YARROWYCK` y zona `BNE5`.
-- `BALL BAY QLD 4740`: Django tomaba zona `MYK1`; Excel usa `BALL BAY` y zona `MYK2`.
-
-Fix: resolver primero `suburb + state`, luego fallback por postcode solo si corresponde.
-
-## component_totals falla con actual vacío
-
-Síntoma:
+Rule:
 
 ```text
-expected_total_weight_kg tiene valor
-actual_total_weight_kg vacío
-Excel generated_output_count = 0
+expected CSVs and imported Excel baseline must be generated together
 ```
 
-Causa: Excel generó componentes pero ningún carrier visible. La batería intentaba tomar componentes desde el primer rank de Django.
+## TEAMTAS GENERAL extremely high value
 
-Fix: usar fallback de `consolidate_lines()` para `component_totals` aunque no haya carrier/rank.
-
-## component_totals falla por cubic 0.02 × pallets
-
-Síntoma:
+Symptom:
 
 ```text
-expected_total_cubic_m3 = Calculator!J24
-actual_total_cubic_m3 = CalcLines!P29 o rating cubic
+TEAMTAS GENERAL
+Excel expected: 828.03
+Django actual before fix: 663983.07
 ```
 
-Causa: se compara cubic visible contra cubic de rating.
+Cause:
+
+Django was treating `TEAMTAS GENERAL` as a normal kg-based carrier and effectively calculated:
+
+```text
+rate * kilograms
+```
+
+Excel uses a TEAMTAS-specific formula based on whole tonne/cubic chargeable units plus an extra TEAMTAS fee.
 
 Fix:
 
-```text
-visible_cubic = rating_cubic - pallets × 0.02
-```
+`calculator.py` now contains a specific branch for `TEAMTAS GENERAL` that mirrors the workbook row logic.
 
-## KTI diferencias pequeñas de centavos
-
-Causa: `FreightRate` guardaba tarifas con 4 decimales y Excel usaba más precisión.
-
-Fix: migración `0002_increase_freightrate_precision.py` para 6 decimales y reimportar workbook.
-
-## TEAMTAS GENERAL extremadamente alto
-
-Síntoma observado:
+Validation after fix:
 
 ```text
-WEEGENA TAS 7304
-SKU BRH4443 qty 2
-Excel TEAMTAS GENERAL = 828.03
-Django TEAMTAS GENERAL = 663983.07
-rate_source_row = 4154
-lookup_key = TEAMTASGENERALLZ25STHP
+random_current 15 cases: 36 OK / 0 FAIL
+live_latest 20 cases: 97 OK / 0 FAIL
 ```
-
-Diagnóstico parcial:
-
-```text
-basic_charge = 1.82
-per_kg = 186.25
-weight = 3565 kg
-generic per_kg × kg = 663983.07
-per tonne candidate = 665.81
-Excel expected = 828.03
-```
-
-Estado: abierto. No aplicar parche incompleto hasta identificar el cargo faltante `162.22` o fórmula exacta en Excel.
