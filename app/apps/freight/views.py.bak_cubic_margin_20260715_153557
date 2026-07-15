@@ -79,7 +79,6 @@ def calculate_freight(request: HttpRequest):
             tailgate=str(payload.get('tailgate', 'NO')).upper() == 'YES',
             preselect_sku=str(payload.get('preselect_sku', 'YES')).upper() == 'YES',
             lines=lines,
-            cubic_margin_percent=_decimal(payload.get('cubic_margin_percent'), '0'),
         )
         results = FreightCalculatorService().calculate(req)
         return JsonResponse({'results': [r.__dict__ for r in results]})

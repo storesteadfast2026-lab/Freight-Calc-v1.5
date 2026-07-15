@@ -35,13 +35,6 @@
       <label>Use Preselected SKU Mode
         <select id="preselect_sku"><option>YES</option><option>NO</option></select>
       </label>
-      <label>Cubic Margin *
-        <select id="cubic_margin_percent">
-          <option value="0">0% - No margin</option>
-          <option value="10">10% - Standard packing margin</option>
-          <option value="15">15% - Conservative packing margin</option>
-        </select>
-      </label>
     </div>
   </section>
 
@@ -72,11 +65,8 @@
     <div class="pricing-note">
     Please note: Final pricing may vary due to applicable fuel surcharges.
     The calculated cubic volume may also increase when multiple items are packed together.
-    </div>
-    <div class="pricing-note">
-    * Select a % margin of error to account for additional packing volume.
-    </div>
-  
+  </div>
+
   </section>
 </main>
 <script>
@@ -172,7 +162,7 @@ async function calculate(){
   try{
     const rows=[...document.querySelectorAll('#lines tbody tr')];
     const lines=rows.map(tr=>({sku:tr.querySelector('.sku').value,quantity:tr.querySelector('.qty').value,freight_type:tr.querySelector('.ftype').value,length_m:tr.querySelector('.len').value,width_m:tr.querySelector('.wid').value,height_m:tr.querySelector('.hei').value,weight_kg:tr.querySelector('.weight').value,cubic_m3:tr.querySelector('.cubic').value}));
-    const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,cubic_margin_percent:document.getElementById('cubic_margin_percent').value,lines};
+    const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,lines};
     const resp=await fetch('/api/calculate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},credentials:'same-origin',body:JSON.stringify(payload)});
     
     let data;
