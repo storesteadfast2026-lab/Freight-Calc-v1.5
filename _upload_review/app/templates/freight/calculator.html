@@ -43,6 +43,14 @@
     <table id="lines" class="products-table">
       <thead><tr><th class="col-product">Product</th><th class="col-qty">Qty</th><th class="col-type">Type</th><th class="col-num">L</th><th class="col-num">W</th><th class="col-num">H</th><th class="col-num">Weight</th><th class="col-num">Cubic</th><th class="col-action"></th></tr></thead>
       <tbody></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="6" style="text-align: right;"><strong>TOTAL</strong></td>
+          <td style="text-align: right;"><input id="total_weight" class="decimal" value="0.00" readonly aria-label="Total Weight" style="text-align: right;"></td>
+          <td style="text-align: right;"><input id="total_cubic" class="decimal" value="0.00" readonly aria-label="Total Cubic" style="text-align: right;"></td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table>
     </div>
     <button onclick="addLine()">Add line</button>
@@ -57,6 +65,8 @@
   </section>
 </main>
 <script>
+const PALLET_WEIGHT_KG = Number('{{ pallet_weight_kg|default:"32.5" }}');
+const PALLET_CUBIC_M3 = Number('{{ pallet_cubic_m3|default:"0.02" }}');
 function debounce(fn, ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 const suburbInput = document.getElementById('suburb_search');
 const suburbResults = document.getElementById('suburb_results');
@@ -72,12 +82,51 @@ function formatNumber(value, decimals=2){
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(decimals) : (0).toFixed(decimals);
 }
+function parseNumber(value){
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+function updateProductTotals(){
+  const rows=[...document.querySelectorAll('#lines tbody tr')];
+  let productWeight=0;
+  let productCubic=0;
+  let palletCount=0;
+
+  rows.forEach(tr=>{
+    const sku=(tr.querySelector('.sku')?.value || '').trim();
+    const qty=parseNumber(tr.querySelector('.qty')?.value);
+
+    if(!sku || qty <= 0){
+      return;
+    }
+
+    const freightType=(tr.querySelector('.ftype')?.value || '').trim().toUpperCase();
+    const weight=parseNumber(tr.querySelector('.weight')?.value);
+    const cubic=parseNumber(tr.querySelector('.cubic')?.value);
+
+    productWeight += weight * qty;
+    productCubic += cubic;
+
+    if(freightType === 'P'){
+      palletCount += qty;
+    }
+  });
+
+  const totalWeight = productWeight + (palletCount > 0.99 ? palletCount * PALLET_WEIGHT_KG : 0);
+  const totalCubic = productCubic;
+
+  document.getElementById('total_weight').value = formatNumber(totalWeight);
+  document.getElementById('total_cubic').value = formatNumber(totalCubic);
+}
 function addLine(){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false)" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.00"></td><td><button onclick="this.closest('tr').remove()">Remove</button></td>`;
+  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false);updateProductTotals()" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.00"></td><td><button onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
   document.querySelector('#lines tbody').appendChild(tr);
-  tr.querySelectorAll('.decimal').forEach(input => input.addEventListener('blur', () => input.value = formatNumber(input.value)));
+  tr.querySelectorAll('.decimal').forEach(input => input.addEventListener('blur', () => { input.value = formatNumber(input.value); updateProductTotals(); }));
+  tr.querySelectorAll('.sku,.qty,.ftype,.weight,.cubic').forEach(input => input.addEventListener('input', updateProductTotals));
+  updateProductTotals();
 }
+
 async function productSearch(input, force=false){
   const q=input.value.trim(); const dd=input.parentElement.querySelector('.product_dd');
   if(!force && q.length<2){dd.innerHTML='';return;}
@@ -94,6 +143,7 @@ function pickProduct(btn,p){
   tr.querySelector('.weight').value=formatNumber(p.weight_kg);
   tr.querySelector('.cubic').value=formatNumber(p.cubic_m3);
   btn.parentElement.innerHTML='';
+  updateProductTotals();
 }
 async function calculate(){
   const status=document.getElementById('calc_status');

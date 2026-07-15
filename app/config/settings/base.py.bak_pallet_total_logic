@@ -82,9 +82,3 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CALCULATOR_REQUIRE_AUTH = os.getenv('CALCULATOR_REQUIRE_AUTH', '0') == '1'
 EXTERNAL_AUTH_HEADER = os.getenv('EXTERNAL_AUTH_HEADER', 'HTTP_X_AUTH_USER')
-
-# Freight calculation constants matching the Excel workbook defaults.
-# Excel source: CalcLines!J7 = pallet weight, CalcLines!K7 = pallet cubic.
-# These can be changed later through environment variables without code changes.
-FREIGHT_PALLET_WEIGHT_KG = os.getenv('FREIGHT_PALLET_WEIGHT_KG', '32.5')
-FREIGHT_PALLET_CUBIC_M3 = os.getenv('FREIGHT_PALLET_CUBIC_M3', '0.02')

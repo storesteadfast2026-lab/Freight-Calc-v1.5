@@ -62,16 +62,9 @@
     <div id="calc_status" class="status"></div>
     <div id="error" class="error"></div>
     <table id="results"><thead><tr><th>Carrier</th><th>Service</th><th>Freight Estimate ex GST</th></tr></thead><tbody></tbody></table>
-    <div class="pricing-note">
-    Please note: Final pricing may vary due to applicable fuel surcharges.
-    The calculated cubic volume may also increase when multiple items are packed together.
-  </div>
-
   </section>
 </main>
 <script>
-const PALLET_WEIGHT_KG = Number('{{ pallet_weight_kg|default:"32.5" }}');
-const PALLET_CUBIC_M3 = Number('{{ pallet_cubic_m3|default:"0.02" }}');
 function debounce(fn, ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 const suburbInput = document.getElementById('suburb_search');
 const suburbResults = document.getElementById('suburb_results');
@@ -93,45 +86,30 @@ function parseNumber(value){
 }
 function updateProductTotals(){
   const rows=[...document.querySelectorAll('#lines tbody tr')];
-  let productWeight=0;
-  let productCubic=0;
-  let palletCount=0;
-
+  let totalWeight=0;
+  let totalCubic=0;
   rows.forEach(tr=>{
     const sku=(tr.querySelector('.sku')?.value || '').trim();
-    const qty=parseNumber(tr.querySelector('.qty')?.value);
-
-    if(!sku || qty <= 0){
+    if(!sku){
       return;
     }
-
-    const freightType=(tr.querySelector('.ftype')?.value || '').trim().toUpperCase();
+    const qty=parseNumber(tr.querySelector('.qty')?.value);
     const weight=parseNumber(tr.querySelector('.weight')?.value);
     const cubic=parseNumber(tr.querySelector('.cubic')?.value);
-
-    productWeight += weight * qty;
-    productCubic += cubic;
-
-    if(freightType === 'P'){
-      palletCount += qty;
-    }
+    totalWeight += weight * qty;
+    totalCubic += cubic;
   });
-
-  const totalWeight = productWeight + (palletCount > 0.99 ? palletCount * PALLET_WEIGHT_KG : 0);
-  const totalCubic = productCubic;
-
   document.getElementById('total_weight').value = formatNumber(totalWeight);
   document.getElementById('total_cubic').value = formatNumber(totalCubic);
 }
 function addLine(){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false);updateProductTotals()" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.00"></td><td><button onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
+  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false)" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.00"></td><td><button onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
   document.querySelector('#lines tbody').appendChild(tr);
   tr.querySelectorAll('.decimal').forEach(input => input.addEventListener('blur', () => { input.value = formatNumber(input.value); updateProductTotals(); }));
-  tr.querySelectorAll('.sku,.qty,.ftype,.weight,.cubic').forEach(input => input.addEventListener('input', updateProductTotals));
+  tr.querySelectorAll('.qty,.ftype,.weight,.cubic').forEach(input => input.addEventListener('input', updateProductTotals));
   updateProductTotals();
 }
-
 async function productSearch(input, force=false){
   const q=input.value.trim(); const dd=input.parentElement.querySelector('.product_dd');
   if(!force && q.length<2){dd.innerHTML='';return;}
@@ -163,8 +141,7 @@ async function calculate(){
     const rows=[...document.querySelectorAll('#lines tbody tr')];
     const lines=rows.map(tr=>({sku:tr.querySelector('.sku').value,quantity:tr.querySelector('.qty').value,freight_type:tr.querySelector('.ftype').value,length_m:tr.querySelector('.len').value,width_m:tr.querySelector('.wid').value,height_m:tr.querySelector('.hei').value,weight_kg:tr.querySelector('.weight').value,cubic_m3:tr.querySelector('.cubic').value}));
     const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,lines};
-    const resp=await fetch('/api/calculate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},credentials:'same-origin',body:JSON.stringify(payload)});
-    
+    const resp=await fetch('/api/calculate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},body:JSON.stringify(payload)});
     let data;
     try{ data=await resp.json(); } catch(e){ data={error:'The server did not return a valid JSON response.'}; }
     if(!resp.ok || data.error){

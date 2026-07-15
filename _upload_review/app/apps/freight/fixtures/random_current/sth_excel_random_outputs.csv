@@ -1,5 +1,7 @@
 ﻿case_id,rank,expected_carrier,expected_service,expected_estimate_ex_gst,validation_status,source,notes
-RANDOM_001,1,TEAMEX,ROAD,268.76,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
-RANDOM_003,1,TEAMEX,ROAD,1500.78,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
-RANDOM_004,1,TEAMTAS,GENERAL,828.03,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
-RANDOM_005,1,TEAMEX,ROAD,2442.11,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_001,1,TEAMEX,ROAD,1754.52,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_002,1,TEAMEX,ROAD,5306.96,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_003,1,COCHRN,ROAD,182.64,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_003,2,TEAMEX,ROAD,276.09,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_003,3,TFMX,ROAD,341.66,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.
+RANDOM_005,1,TEAMTAS,GENERAL,1433.17,generated_from_excel_live,Microsoft Excel automation,Generated on demand from live Excel workbook.

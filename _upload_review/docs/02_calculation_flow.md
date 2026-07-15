@@ -40,3 +40,51 @@ This correction fixes the observed TEAMEX mismatch for Blair Athol / SA 5084 wit
 ## Regression warning
 
 `BrokerTotals` contains complex carrier-specific formulas. Each carrier-specific branch must be locked against Excel regression cases before production use.
+
+## TEAMTAS GENERAL Excel-specific calculation
+
+`TEAMTAS GENERAL` does not use the generic `Rate * kilograms` calculation.
+
+The workbook logic for `TEAMTAS GENERAL` is based on `BrokerTotals` row 20 and includes these important behaviors:
+
+1. Chargeable units are based on the greater of:
+   - rating cubic units: `CalcLines!P29 * cubic_conversion`
+   - actual tonnes: `CalcLines!O29 / 1000`
+2. The chargeable value is rounded up to a whole unit.
+3. The base freight uses TEAMTAS-specific logic:
+   - `Basic * rating_units`
+   - plus subsequent charge when applicable
+   - plus `Rate * whole chargeable unit`
+4. Excel also adds a TEAMTAS-specific fee equivalent to:
+
+```text
+(pallet_count * 2) + (visible_cubic * 0.6)
+```
+
+The visible cubic used in this fee is the customer-visible `Calculator!J24` style cubic, not the internal rating cubic. Since Django consolidation includes pallet cubic, the visible cubic is derived by subtracting pallet cubic:
+
+```text
+visible_cubic = rating_cubic - (pallet_count * 0.02)
+```
+
+This correction fixed the random validation case:
+
+```text
+RANDOM_004
+Destination: WEEGENA TAS 7304
+Product: BRH4443 x 2
+Excel expected: 828.03
+Django before fix: 663983.07
+Django after fix: matches Excel
+```
+
+## Validation baseline alignment rule
+
+A validation battery is only meaningful when the expected CSV files and the imported PostgreSQL data come from the same generated Excel baseline.
+
+Do not mix:
+
+- expected CSVs generated from one Excel baseline
+- PostgreSQL imported from another Excel baseline
+
+Mixing them can produce false failures even when the Django calculation logic is correct.

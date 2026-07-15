@@ -51,3 +51,14 @@ label{position:relative}.dropdown{left:0;right:auto;top:100%;box-sizing:border-b
 
 @media(max-width:1180px){.calculator-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.calculator-grid{grid-template-columns:1fr}.combo-field .dropdown,.product-combo .dropdown{width:100%;max-width:100%}}
+
+.pricing-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #475467;
+  background: #f8fafc;
+  border-left: 4px solid #98a2b3;
+  border-radius: 8px;
+}

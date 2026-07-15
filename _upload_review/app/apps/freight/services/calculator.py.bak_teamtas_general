@@ -1,8 +1,8 @@
-from decimal import Decimal, ROUND_UP, ROUND_HALF_UP
+from decimal import Decimal, ROUND_UP
 from apps.carriers.models import ClientCarrierConfig
 from apps.rates.models import FreightZone, FreightRate
 from .dtos import FreightRequest, FreightResult
-from .consolidator import consolidate_lines, PALLET_CUBIC_M3
+from .consolidator import consolidate_lines
 from .validators import validate_location, validate_consolidated
 from .resolvers import resolve_client, resolve_postcode
 from .tailgate_calculator import calculate_tailgate, calculate_hand_unload
@@ -87,23 +87,6 @@ def _teamtas_weight_break(weight: Decimal) -> str:
     if weight >= Decimal('18'):
         return '5'
     return ''
-
-
-
-def _is_teamtas_general_code(carrier_code: str, service_code: str) -> bool:
-    return carrier_code == 'TEAMTAS' and service_code == 'GENERAL'
-
-
-def _is_teamtas_general_config(cfg: ClientCarrierConfig) -> bool:
-    carrier_code = (cfg.carrier_service.carrier.code or '').strip().upper()
-    service_code = (cfg.carrier_service.service_code or '').strip().upper()
-    return _is_teamtas_general_code(carrier_code, service_code)
-
-
-def _is_teamtas_general_rate(rate: FreightRate) -> bool:
-    carrier_code = (rate.carrier_service.carrier.code or '').strip().upper()
-    service_code = (rate.carrier_service.service_code or '').strip().upper()
-    return _is_teamtas_general_code(carrier_code, service_code)
 
 
 def _machipe_mipec_weight_break(weight: Decimal) -> str:
@@ -226,14 +209,12 @@ class FreightCalculatorService:
             if zone_data is None:
                 continue
 
-            weight = self._chargeable_weight_for_config(cfg, consolidated)
+            weight = chargeable_weight(consolidated.cubic_total_m3, cfg.cubic_conversion, consolidated.weight_total_kg)
             rate = self._resolve_rate_for_config(client, cfg, zone_data, consolidated.freight_type_for_rate, weight)
             if rate is None:
                 continue
 
-            unit_count = consolidated.pallet_count + consolidated.carton_count
-            freight_base = self._calculate_base_freight(rate, weight, unit_count, cfg, consolidated)
-            teamtas_general_fee = self._teamtas_general_fee(cfg, consolidated)
+            freight_base = self._calculate_base_freight(rate, weight, consolidated.pallet_count + consolidated.carton_count)
             tailgate_fee = calculate_tailgate(client, carrier, consolidated.pallet_count, consolidated.tailgate) if cfg.tailgate_enabled else Decimal('0')
             hand_unload = calculate_hand_unload(client, carrier, consolidated.pallet_count, consolidated.tailgate, cfg.hand_unload_enabled)
             overlength = overlength_fee(consolidated.max_length_m) if cfg.overlength_enabled else Decimal('0')
@@ -248,12 +229,10 @@ class FreightCalculatorService:
                 + hand_unload
                 + rate.remote_charge
                 + rate.offshore_charge
-                + teamtas_general_fee
                 + fuel
             )
             uprate_amount = subtotal_before_uprate * cfg.uprate
-            total_before_display = subtotal_before_uprate + uprate_amount + handling
-            estimate = self._final_estimate_for_config(cfg, total_before_display)
+            estimate = roundup(subtotal_before_uprate + uprate_amount + handling)
 
             results.append(FreightResult(
                 carrier=carrier.code,
@@ -277,7 +256,6 @@ class FreightCalculatorService:
                     'tailgate_fee': str(roundup(tailgate_fee)),
                     'hand_unload': str(roundup(hand_unload)),
                     'overlength': str(roundup(overlength)),
-                    'teamtas_general_fee': str(teamtas_general_fee),
                     'remote': str(rate.remote_charge),
                     'offshore': str(rate.offshore_charge),
                     'handling': str(handling),
@@ -364,59 +342,15 @@ class FreightCalculatorService:
             freight_type=freight_type,
         ).filter(weight_break__in=[wb, '']).order_by('-weight_break').first()
 
-    def _chargeable_weight_for_config(self, cfg: ClientCarrierConfig, consolidated) -> Decimal:
-        """Return BrokerTotals!AF value for the carrier row.
-
-        TEAMTAS GENERAL is charged in whole tonnes/cubic units. Excel row 20
-        compares rating cubic (CalcLines!P29 * cubic conversion) with actual
-        weight in tonnes (CalcLines!O29 / 1000), then rounds up to a whole unit.
-        Other carriers keep the previous kg-based chargeable weight logic.
-        """
-        if _is_teamtas_general_config(cfg):
-            rating_units = consolidated.cubic_total_m3 * (cfg.cubic_conversion or Decimal('0'))
-            actual_tonnes = consolidated.weight_total_kg / Decimal('1000')
-            return max(rating_units, actual_tonnes).quantize(Decimal('1'), rounding=ROUND_UP)
-        return chargeable_weight(consolidated.cubic_total_m3, cfg.cubic_conversion, consolidated.weight_total_kg)
-
-    def _calculate_base_freight(self, rate: FreightRate, weight: Decimal, unit_count: Decimal, cfg: ClientCarrierConfig, consolidated) -> Decimal:
+    def _calculate_base_freight(self, rate: FreightRate, weight: Decimal, unit_count: Decimal) -> Decimal:
         """Replicate BrokerTotals!L main formula.
 
-        English: Most carriers use Basic + Subsequent + Rate*ChargeableWeight.
-        TEAMTAS GENERAL row 20 is different: Excel multiplies Basic by rating
-        cubic units before adding Rate*whole-tonne chargeable weight.
-
-        Español: La mayoría de carriers usa Basic + Subsequent + Rate*PesoCobrable.
-        TEAMTAS GENERAL fila 20 es distinto: Excel multiplica Basic por el cubic
-        rating antes de sumar Rate*peso cobrable en toneladas/unidades enteras.
+        English: Total = ROUNDUP(MAX(Minimum, Basic + Subsequent + Rate*ChargeableWeight), 2).
+        Español: Total = redondeo hacia arriba del mayor entre mínimo y cálculo base.
         """
         subsequent = Decimal('0')
         if unit_count > Decimal('1.99'):
             subsequent = (unit_count - Decimal('1')) * rate.per_subsequent_basic
-
-        if _is_teamtas_general_rate(rate):
-            rating_units = consolidated.cubic_total_m3 * (cfg.cubic_conversion or Decimal('0'))
-            candidate = (rate.basic_charge * rating_units) + subsequent + (rate.per_kg * weight)
-        else:
-            candidate = rate.basic_charge + subsequent + (rate.per_kg * weight)
-
+        candidate = rate.basic_charge + subsequent + (rate.per_kg * weight)
         base = max(rate.minimum_charge, candidate)
         return roundup(base)
-
-    def _teamtas_general_fee(self, cfg: ClientCarrierConfig, consolidated) -> Decimal:
-        """Replicate BrokerTotals!AW20 for TEAMTAS GENERAL.
-
-        Excel row 20 adds AW20 outside the freight base:
-        AW20 = (CalcLines!M29 * 2) + (CalcLines!L29 * 0.6)
-        where M29 is pallet count and L29 is Calculator-visible cubic. Django's
-        consolidated cubic includes pallet cubic, so remove pallet cubic first.
-        """
-        if not _is_teamtas_general_config(cfg):
-            return Decimal('0')
-        visible_cubic = consolidated.cubic_total_m3 - (consolidated.pallet_count * PALLET_CUBIC_M3)
-        return (consolidated.pallet_count * Decimal('2')) + (visible_cubic * Decimal('0.6'))
-
-    def _final_estimate_for_config(self, cfg: ClientCarrierConfig, total: Decimal) -> Decimal:
-        """Return the amount as Excel displays it for the carrier row."""
-        if _is_teamtas_general_config(cfg):
-            return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        return roundup(total)

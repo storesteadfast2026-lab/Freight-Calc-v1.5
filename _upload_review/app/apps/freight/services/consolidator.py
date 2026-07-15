@@ -1,8 +1,14 @@
 from decimal import Decimal
+from django.conf import settings
 from .dtos import FreightLine, ConsolidatedFreight
 
-PALLET_WEIGHT_KG = Decimal('32.5')  # CalcLines!J7
-PALLET_CUBIC_M3 = Decimal('0.02')   # CalcLines!K7
+
+def _decimal_setting(name: str, default: str) -> Decimal:
+    return Decimal(str(getattr(settings, name, default)))
+
+
+PALLET_WEIGHT_KG = _decimal_setting('FREIGHT_PALLET_WEIGHT_KG', '32.5')  # CalcLines!J7
+PALLET_CUBIC_M3 = _decimal_setting('FREIGHT_PALLET_CUBIC_M3', '0.02')   # CalcLines!K7
 
 
 def consolidate_lines(lines: list[FreightLine], tailgate: bool) -> ConsolidatedFreight:

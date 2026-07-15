@@ -9,12 +9,19 @@ from apps.products.models import Product
 from .services.dtos import FreightRequest, FreightLine
 from .services.calculator import FreightCalculatorService
 from .services.validators import ValidationError
+from .services.consolidator import PALLET_WEIGHT_KG, PALLET_CUBIC_M3
+from django.views.decorators.csrf import ensure_csrf_cookie
 
-
+@ensure_csrf_cookie
 def calculator_page(request: HttpRequest):
     client = Client.objects.filter(code='STH').first()
     from_addresses = FromAddress.objects.filter(client=client, active=True) if client else []
-    return render(request, 'freight/calculator.html', {'client': client, 'from_addresses': from_addresses})
+    return render(request, 'freight/calculator.html', {
+        'client': client,
+        'from_addresses': from_addresses,
+        'pallet_weight_kg': PALLET_WEIGHT_KG,
+        'pallet_cubic_m3': PALLET_CUBIC_M3,
+    })
 
 
 @require_GET
