@@ -43,7 +43,7 @@ def product_autocomplete(request: HttpRequest):
     if q:
         qs = qs.filter(sku__icontains=q) | qs.filter(name__icontains=q) | qs.filter(description__icontains=q)
     data = [
-        {'sku': p.sku, 'label': f'{p.sku} - {p.name or p.description}', 'length_m': str(p.length_m), 'width_m': str(p.width_m), 'height_m': str(p.height_m), 'weight_kg': str(p.weight_kg), 'cubic_m3': str(p.cubic_m3), 'freight_type': p.freight_type}
+        {'sku': p.sku, 'label': f'{p.sku}', 'length_m': str(p.length_m), 'width_m': str(p.width_m), 'height_m': str(p.height_m), 'weight_kg': str(p.weight_kg), 'cubic_m3': str(p.cubic_m3), 'freight_type': p.freight_type}
         for p in qs.distinct()[:20]
     ]
     return JsonResponse({'results': data})

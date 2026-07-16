@@ -15,10 +15,17 @@
     </div>
     <div class="grid calculator-grid">
       <label>From Address
+
         <select id="from_address_id">
           <option value="">Default / Not selected</option>
-          {% for addr in from_addresses %}<option value="{{ addr.id }}">{{ addr.name }} - {{ addr.suburb }} {{ addr.state }}</option>{% endfor %}
+
+          {% for addr in from_addresses %}
+            <option value="{{ addr.id }}" {% if addr.is_default %}selected{% endif %}>
+              {{ addr.name }} - {{ addr.address_line_1 }}, {{ addr.suburb }} {{ addr.state }} {{ addr.postcode }}
+            </option>
+          {% endfor %}
         </select>
+
       </label>
       <label>To Suburb
         <div class="combo-field">
@@ -47,7 +54,7 @@
         <tr>
           <td colspan="6" style="text-align: right;"><strong>TOTAL</strong></td>
           <td style="text-align: right;"><input id="total_weight" class="decimal" value="0.00" readonly aria-label="Total Weight" style="text-align: right;"></td>
-          <td style="text-align: right;"><input id="total_cubic" class="decimal" value="0.00" readonly aria-label="Total Cubic" style="text-align: right;"></td>
+          <td style="text-align: right;"><input id="total_cubic" class="decimal" value="0.000" readonly aria-label="Total Cubic" style="text-align: right;"></td>
           <td></td>
         </tr>
       </tfoot>
@@ -121,13 +128,19 @@ function updateProductTotals(){
   const totalCubic = productCubic;
 
   document.getElementById('total_weight').value = formatNumber(totalWeight);
-  document.getElementById('total_cubic').value = formatNumber(totalCubic);
+  document.getElementById('total_cubic').value = formatNumber(totalCubic, 3);
 }
 function addLine(){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false);updateProductTotals()" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.00"></td><td><button onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
+  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false);updateProductTotals()" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.000"></td><td><button onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
   document.querySelector('#lines tbody').appendChild(tr);
-  tr.querySelectorAll('.decimal').forEach(input => input.addEventListener('blur', () => { input.value = formatNumber(input.value); updateProductTotals(); }));
+  tr.querySelectorAll('.decimal').forEach(input =>
+    input.addEventListener('blur', () => {
+      const decimals = input.classList.contains('cubic') ? 3 : 2;
+      input.value = formatNumber(input.value, decimals);
+      updateProductTotals();
+    })
+  );
   tr.querySelectorAll('.sku,.qty,.ftype,.weight,.cubic').forEach(input => input.addEventListener('input', updateProductTotals));
   updateProductTotals();
 }
@@ -146,7 +159,7 @@ function pickProduct(btn,p){
   tr.querySelector('.wid').value=formatNumber(p.width_m);
   tr.querySelector('.hei').value=formatNumber(p.height_m);
   tr.querySelector('.weight').value=formatNumber(p.weight_kg);
-  tr.querySelector('.cubic').value=formatNumber(p.cubic_m3);
+  tr.querySelector('.cubic').value=formatNumber(p.cubic_m3, 3);
   btn.parentElement.innerHTML='';
   updateProductTotals();
 }
