@@ -24,7 +24,6 @@ class FreightRequest:
     tailgate: bool
     preselect_sku: bool
     lines: list[FreightLine] = field(default_factory=list)
-    cubic_margin_percent: Decimal = Decimal('0')
 
 
 @dataclass
