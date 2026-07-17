@@ -15,17 +15,10 @@
     </div>
     <div class="grid calculator-grid">
       <label>From Address
-
         <select id="from_address_id">
           <option value="">Default / Not selected</option>
-
-          {% for addr in from_addresses %}
-            <option value="{{ addr.id }}" {% if addr.is_default %}selected{% endif %}>
-              {{ addr.name }} - {{ addr.address_line_1 }}, {{ addr.suburb }} {{ addr.state }} {{ addr.postcode }}
-            </option>
-          {% endfor %}
+          {% for addr in from_addresses %}<option value="{{ addr.id }}">{{ addr.name }} - {{ addr.suburb }} {{ addr.state }}</option>{% endfor %}
         </select>
-
       </label>
       <label>To Suburb
         <div class="combo-field">
@@ -42,13 +35,6 @@
       <label>Use Preselected SKU Mode
         <select id="preselect_sku"><option>YES</option><option>NO</option></select>
       </label>
-      <label>Cubic Margin *
-        <select id="cubic_margin_percent">
-          <option value="0">0% - No margin</option>
-          <option value="10">10% - Standard packing margin</option>
-          <option value="15">15% - Conservative packing margin</option>
-        </select>
-      </label>
     </div>
   </section>
 
@@ -61,7 +47,7 @@
         <tr>
           <td colspan="6" style="text-align: right;"><strong>TOTAL</strong></td>
           <td style="text-align: right;"><input id="total_weight" class="decimal" value="0.00" readonly aria-label="Total Weight" style="text-align: right;"></td>
-          <td style="text-align: right;"><input id="total_cubic" class="decimal" value="0.000" readonly aria-label="Total Cubic" style="text-align: right;"></td>
+          <td style="text-align: right;"><input id="total_cubic" class="decimal" value="0.00" readonly aria-label="Total Cubic" style="text-align: right;"></td>
           <td></td>
         </tr>
       </tfoot>
@@ -79,14 +65,8 @@
     <div class="pricing-note">
     Please note: Final pricing may vary due to applicable fuel surcharges.
     The calculated cubic volume may also increase when multiple items are packed together.
-    </div>
-    <div class="pricing-note">
-    * Select a % margin of error to account for additional packing volume.
-    </div>
-     <div class="pricing-note">
-    ** Freight Calculator preliminary version - v0.1<br>
-    ** CubicMargin option is not WORKING
-    </div>
+  </div>
+
   </section>
 </main>
 <script>
@@ -141,19 +121,13 @@ function updateProductTotals(){
   const totalCubic = productCubic;
 
   document.getElementById('total_weight').value = formatNumber(totalWeight);
-  document.getElementById('total_cubic').value = formatNumber(totalCubic, 3);
+  document.getElementById('total_cubic').value = formatNumber(totalCubic);
 }
 function addLine(){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false);updateProductTotals()" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.000"></td><td><button onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
+  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false);updateProductTotals()" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.00"></td><td><button onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
   document.querySelector('#lines tbody').appendChild(tr);
-  tr.querySelectorAll('.decimal').forEach(input =>
-    input.addEventListener('blur', () => {
-      const decimals = input.classList.contains('cubic') ? 3 : 2;
-      input.value = formatNumber(input.value, decimals);
-      updateProductTotals();
-    })
-  );
+  tr.querySelectorAll('.decimal').forEach(input => input.addEventListener('blur', () => { input.value = formatNumber(input.value); updateProductTotals(); }));
   tr.querySelectorAll('.sku,.qty,.ftype,.weight,.cubic').forEach(input => input.addEventListener('input', updateProductTotals));
   updateProductTotals();
 }
@@ -172,7 +146,7 @@ function pickProduct(btn,p){
   tr.querySelector('.wid').value=formatNumber(p.width_m);
   tr.querySelector('.hei').value=formatNumber(p.height_m);
   tr.querySelector('.weight').value=formatNumber(p.weight_kg);
-  tr.querySelector('.cubic').value=formatNumber(p.cubic_m3, 3);
+  tr.querySelector('.cubic').value=formatNumber(p.cubic_m3);
   btn.parentElement.innerHTML='';
   updateProductTotals();
 }
@@ -188,7 +162,7 @@ async function calculate(){
   try{
     const rows=[...document.querySelectorAll('#lines tbody tr')];
     const lines=rows.map(tr=>({sku:tr.querySelector('.sku').value,quantity:tr.querySelector('.qty').value,freight_type:tr.querySelector('.ftype').value,length_m:tr.querySelector('.len').value,width_m:tr.querySelector('.wid').value,height_m:tr.querySelector('.hei').value,weight_kg:tr.querySelector('.weight').value,cubic_m3:tr.querySelector('.cubic').value}));
-    const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,cubic_margin_percent:document.getElementById('cubic_margin_percent').value,lines};
+    const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,lines};
     const resp=await fetch('/api/calculate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},credentials:'same-origin',body:JSON.stringify(payload)});
     
     let data;

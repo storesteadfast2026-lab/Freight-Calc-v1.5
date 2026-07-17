@@ -1,10 +1,9 @@
-from dataclasses import replace
 from decimal import Decimal, ROUND_UP, ROUND_HALF_UP
 from apps.carriers.models import ClientCarrierConfig
 from apps.rates.models import FreightZone, FreightRate
 from .dtos import FreightRequest, FreightResult
 from .consolidator import consolidate_lines, PALLET_CUBIC_M3
-from .validators import validate_location, validate_consolidated, ValidationError
+from .validators import validate_location, validate_consolidated
 from .resolvers import resolve_client, resolve_postcode
 from .tailgate_calculator import calculate_tailgate, calculate_hand_unload
 
@@ -21,42 +20,6 @@ def chargeable_weight(cubic_total: Decimal, cubic_conversion: Decimal, actual_we
     """BrokerTotals!AF: ROUNDUP(MAX(Cubic*CubicConv, Kg), 0)."""
     volumetric = cubic_total * (cubic_conversion or Decimal('0'))
     return max(volumetric, actual_weight).quantize(Decimal('1'), rounding=ROUND_UP)
-
-
-MAX_CUBIC_MARGIN_PERCENT = Decimal('15')
-
-
-def apply_cubic_margin(consolidated, margin_percent: Decimal):
-    """Apply optional cubic margin to visible/product cubic before carrier rating.
-
-    The default margin is 0%, so the Excel validation batteries remain unchanged.
-    The margin is applied only to product-visible cubic. Pallet cubic is added
-    back afterwards because Excel treats pallet cubic as a separate internal
-    rating allowance.
-    """
-    margin_percent = Decimal(str(margin_percent or '0'))
-
-    if margin_percent < Decimal('0'):
-        raise ValidationError('Cubic margin percent cannot be negative')
-    if margin_percent > MAX_CUBIC_MARGIN_PERCENT:
-        raise ValidationError('Cubic margin percent cannot be greater than 15')
-    if margin_percent == Decimal('0'):
-        return consolidated
-
-    pallet_cubic = (
-        consolidated.pallet_count * PALLET_CUBIC_M3
-        if consolidated.pallet_count > Decimal('0.99')
-        else Decimal('0')
-    )
-    visible_cubic = consolidated.cubic_total_m3 - pallet_cubic
-    adjusted_visible_cubic = (
-        visible_cubic * (Decimal('1') + (margin_percent / Decimal('100')))
-    ).quantize(Decimal('0.001'), rounding=ROUND_UP)
-    adjusted_rating_cubic = (
-        adjusted_visible_cubic + pallet_cubic
-    ).quantize(Decimal('0.001'), rounding=ROUND_UP)
-
-    return replace(consolidated, cubic_total_m3=adjusted_rating_cubic)
 
 
 def _teamex_weight_break(weight: Decimal) -> str:
@@ -242,7 +205,6 @@ class FreightCalculatorService:
             request.postcode = resolve_postcode(request.suburb, request.state)
         validate_location(request)
         consolidated = consolidate_lines(request.lines, request.tailgate)
-        consolidated = apply_cubic_margin(consolidated, request.cubic_margin_percent)
         validate_consolidated(consolidated)
 
         results: list[FreightResult] = []
