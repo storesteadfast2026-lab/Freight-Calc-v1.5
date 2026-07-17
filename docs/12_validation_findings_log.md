@@ -1,5 +1,30 @@
 # Validation Findings Log
 
+## 2026-07-17 - Fuel source moved to manual Django Admin activation
+
+### Decision
+
+Operational fuel rates are no longer owned by the cached `FuelSurcharge!K` value after an Admin fuel dataset has been activated. Django downloads or accepts `fuel.csv`, validates it, previews changes and updates `ClientCarrierConfig.fuel_levy` transactionally.
+
+### Compatibility
+
+- Workbook fuel remains available as a legacy bootstrap.
+- Normal workbook imports reapply the active Admin fuel dataset.
+- Excel-vs-Django historical validation explicitly uses workbook fuel and restores active operational fuel after a completed run.
+- A recovery command is available: `python manage.py reapply_active_fuel --client STH`.
+
+### Verification
+
+Automated tests added for valid activation, invalid CSV preservation, duplicate active files, expired-file controls, rollback and reapplication after config rebuild.
+
+Current targeted result:
+
+```text
+7 tests passed
+- 5 fuel import tests
+- 2 existing freight tests
+```
+
 This log records calculation mismatches, root causes, corrections, and validation results. It is the operational memory for Excel-to-Django parity.
 
 ## 2026-07-14 - TEAMTAS GENERAL fix and validation baseline refresh
@@ -112,3 +137,18 @@ TEAMEX must not freely fall back to postcode-only aliases when Excel does not ra
 ### KTI precision
 
 KTI required higher decimal precision in imported rates. `FreightRate` decimal precision was increased to preserve six decimal places.
+
+## 2026-07-17 — PostgreSQL row-lock failure during fuel activation
+
+- **Status:** Corrected in hotfix `0717.1552`.
+- **Observed in:** `apps.imports.tests.test_fuel_import` using PostgreSQL.
+- **Error:** `FOR UPDATE cannot be applied to the nullable side of an outer join`.
+- **Root cause:** `select_for_update()` was combined with
+  `select_related('fuel_data_file')`; the nullable foreign key generated a
+  `LEFT OUTER JOIN` that PostgreSQL cannot lock.
+- **Change:** removed the nullable join and restricted the lock to
+  `ClientCarrierConfig` with `select_for_update(of=('self',))`.
+- **Business logic impact:** none. Fuel matching, validation, activation,
+  rollback and audit behavior remain unchanged.
+- **Regression command:**
+  `docker compose exec web python manage.py test apps.imports.tests.test_fuel_import -v 2`.

@@ -109,3 +109,115 @@ Validation after fix:
 random_current 15 cases: 36 OK / 0 FAIL
 live_latest 20 cases: 97 OK / 0 FAIL
 ```
+
+## Fetch fuel from source fails
+
+Check that the web container can access HTTPS and resolve DNS:
+
+```powershell
+docker compose exec web python -c "from urllib.request import urlopen; print(urlopen('https://www.poscat.com.au/fuelsc/fuel.csv', timeout=30).status)"
+```
+
+Also check `.env`:
+
+```text
+FUEL_SOURCE_URL=https://www.poscat.com.au/fuelsc/fuel.csv
+FUEL_FETCH_TIMEOUT_SECONDS=30
+```
+
+A failed fetch does not modify carrier fuel rates. Review:
+
+```text
+Django Admin → Audit → Audit events
+```
+
+for `FUEL_FETCH_FAILED`.
+
+## Fuel file validates but cannot be activated
+
+Review `Validation summary` for:
+
+- expired dataset;
+- missing required columns;
+- duplicate `master_rate`;
+- no Django ratecards matched;
+- identical file already active.
+
+Expired data is blocked unless a superuser supplies a force justification.
+
+## Fuel rates reverted after workbook import
+
+Normal imports use active Admin fuel automatically. Confirm the command did not explicitly use:
+
+```text
+--fuel-source workbook
+```
+
+To restore the active operational dataset:
+
+```powershell
+docker compose exec web python manage.py reapply_active_fuel --client STH
+```
+
+Then verify in:
+
+```text
+Carriers → Client carrier configs
+```
+
+that `Fuel levy source` is `ADMIN_WEB_FETCH` or `ADMIN_UPLOAD`.
+
+## Uploaded files disappear after recreating containers
+
+Confirm `docker-compose.yml` contains:
+
+```yaml
+- ./uploaded_data:/app/uploaded_data
+```
+
+and that the host folder is writable by Docker Desktop.
+
+## PostgreSQL: `FOR UPDATE cannot be applied to the nullable side of an outer join`
+
+### Symptom
+
+Fuel activation tests or the Admin activation action fail with:
+
+```text
+psycopg.errors.FeatureNotSupported:
+FOR UPDATE cannot be applied to the nullable side of an outer join
+```
+
+### Cause
+
+`activate_fuel_file()` used `select_for_update()` together with
+`select_related('fuel_data_file')`. `fuel_data_file` is nullable, so Django
+created a `LEFT OUTER JOIN`. PostgreSQL does not permit `SELECT ... FOR UPDATE`
+to lock the nullable side of that join.
+
+### Resolution
+
+Lock only rows from `ClientCarrierConfig` and do not join the nullable
+`fuel_data_file` relation:
+
+```python
+ClientCarrierConfig.objects.select_for_update(of=('self',)) \
+    .filter(client=locked_file.client) \
+    .select_related('carrier_service__carrier')
+```
+
+The code only needs `fuel_data_file_id`, which is available without loading the
+related object.
+
+### Verification
+
+```powershell
+docker compose exec web python manage.py test apps.imports.tests.test_fuel_import -v 2
+```
+
+Expected result:
+
+```text
+Ran 6 tests
+OK
+```
