@@ -152,23 +152,3 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
   rollback and audit behavior remain unchanged.
 - **Regression command:**
   `docker compose exec web python manage.py test apps.imports.tests.test_fuel_import -v 2`.
-
-## 2026-07-17 — Fuel validation summary readability
-
-- **Status:** Implemented in UI patch `0717.2220`.
-- **Issue:** `ExternalDataFile.validation_summary` was displayed as a large raw JSON block in Django Admin.
-- **Change:** the existing JSON is now rendered as summary cards, a rate comparison table, warning/error panels, ratecard coverage and collapsed raw JSON.
-- **Data impact:** none. The JSON stored in PostgreSQL is unchanged.
-- **Calculation impact:** none.
-- **Migration required:** no.
-- **Deployment:** replace `admin.py`, add the summary template, and restart the `web` container.
-
-## 2026-07-17 — Compact fuel validation summary
-
-- **Status:** Implemented in UI patch `0717.2237`.
-- **Issue:** The first structured summary remained too detailed for an experienced technical administrator.
-- **Change:** the primary view now shows a one-line status, operational counts and only configurations whose fuel rate will change.
-- **Collapsed by default:** unchanged configurations, matched/unused ratecards, complete metadata and raw JSON.
-- **Data impact:** none.
-- **Calculation impact:** none.
-- **Migration required:** no.

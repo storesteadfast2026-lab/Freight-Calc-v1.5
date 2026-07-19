@@ -167,31 +167,3 @@ If historical validation or another controlled operation is interrupted before r
 ```powershell
 docker compose exec web python manage.py reapply_active_fuel --client STH
 ```
-
-## Fuel validation summary presentation
-
-The fuel validation JSON remains stored unchanged in `ExternalDataFile.validation_summary`.
-Django Admin renders it as:
-
-- status and count cards;
-- a carrier/service/ratecard comparison table;
-- fuel rates displayed as percentages;
-- percentage-point difference between current and proposed rates;
-- warnings and errors in separate panels;
-- matched and missing ratecard coverage;
-- raw JSON collapsed under `Show raw validation JSON`.
-
-This is a presentation-only change. It does not modify validation, activation, rollback,
-audit, database fields or calculation logic.
-
-## Compact fuel validation presentation
-
-The Admin summary prioritises operational decisions:
-
-- one-line validation, source dates, valid-row count and shortened SHA-256;
-- counts for changes, unchanged configurations, Django ratecards missing from the file and errors;
-- only changed carrier/service rates in the primary table;
-- missing Django ratecards and validation errors shown immediately;
-- unchanged rows, unused file ratecards, complete file metadata and raw JSON collapsed by default.
-
-The underlying `validation_summary` JSON, validation rules, activation and rollback logic are unchanged.

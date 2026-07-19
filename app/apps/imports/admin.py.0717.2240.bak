@@ -184,31 +184,16 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
             status_label = 'Validated'
             status_class = 'sth-status-success'
 
-        change_rows = [row for row in preview_rows if row['result'] == 'CHANGE']
-        unchanged_rows = [row for row in preview_rows if row['result'] == 'UNCHANGED']
-        sha256 = obj.sha256 or ''
-        sha256_short = (
-            f'{sha256[:8]}…{sha256[-6:]}' if len(sha256) > 16 else (sha256 or '—')
-        )
-
         context = {
             'summary': summary,
             'status_label': status_label,
             'status_class': status_class,
-            'change_rows': change_rows,
-            'unchanged_rows': unchanged_rows,
+            'preview_rows': preview_rows,
             'warnings': warnings,
             'errors': errors,
             'ratecards_matched': summary.get('ratecards_matched') or [],
             'ratecards_not_found': summary.get('ratecards_not_found_in_django') or [],
             'django_ratecards_missing': summary.get('django_ratecards_missing_from_file') or [],
-            'sha256': sha256,
-            'sha256_short': sha256_short,
-            'original_filename': obj.original_filename or '—',
-            'source_method': obj.source_method or '—',
-            'source_url': obj.source_url or '—',
-            'uploaded_by': obj.uploaded_by,
-            'uploaded_at': obj.uploaded_at,
             'raw_json': json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True),
         }
         return mark_safe(render_to_string(
