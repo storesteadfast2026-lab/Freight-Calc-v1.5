@@ -23,7 +23,7 @@ def chargeable_weight(cubic_total: Decimal, cubic_conversion: Decimal, actual_we
     return max(volumetric, actual_weight).quantize(Decimal('1'), rounding=ROUND_UP)
 
 
-MAX_CUBIC_MARGIN_PERCENT = Decimal('20')
+MAX_CUBIC_MARGIN_PERCENT = Decimal('15')
 
 
 def apply_cubic_margin(consolidated, margin_percent: Decimal):
@@ -36,10 +36,10 @@ def apply_cubic_margin(consolidated, margin_percent: Decimal):
     """
     margin_percent = Decimal(str(margin_percent or '0'))
 
-    if margin_percent != margin_percent.to_integral_value():
-        raise ValidationError('Cubic margin percent must be a whole number between 0 and 20')
-    if margin_percent < Decimal('0') or margin_percent > MAX_CUBIC_MARGIN_PERCENT:
-        raise ValidationError('Cubic margin percent must be a whole number between 0 and 20')
+    if margin_percent < Decimal('0'):
+        raise ValidationError('Cubic margin percent cannot be negative')
+    if margin_percent > MAX_CUBIC_MARGIN_PERCENT:
+        raise ValidationError('Cubic margin percent cannot be greater than 15')
     if margin_percent == Decimal('0'):
         return consolidated
 

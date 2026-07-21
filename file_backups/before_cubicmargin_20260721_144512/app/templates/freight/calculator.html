@@ -43,7 +43,8 @@
         <select id="preselect_sku"><option>YES</option><option>NO</option></select>
       </label>
       <label>Cubic Margin (%) *
-        <input id="cubic_margin_percent" type="number" min="0" max="20" step="1" placeholder="0–20" inputmode="numeric" aria-label="Cubic Margin percentage">
+        <input id="cubic_margin_percent" type="number" min="0" max="20" step="1" placeholder="0–20" inputmode="numeric" aria-label="Cubic Margin percentage" aria-describedby="cubic_margin_error">
+        <small id="cubic_margin_error" role="alert" aria-live="polite" style="display:none;">Use 0–20</small>
       </label>
     </div>
   </section>
@@ -158,23 +159,16 @@ function addLine(){
 
 function validateCubicMargin(){
   const input=document.getElementById('cubic_margin_percent');
-  const resultsError=document.getElementById('error');
+  const error=document.getElementById('cubic_margin_error');
   const calculateButton=document.querySelector('button.primary');
   const raw=input.value.trim();
   const value=Number(raw);
-  const marginError='Cubic Margin must have a value between 0 and 20.';
   const valid=raw === '' || (Number.isInteger(value) && value >= 0 && value <= 20);
 
-  input.setCustomValidity(valid ? '' : marginError);
+  input.setCustomValidity(valid ? '' : 'Use 0–20');
   input.setAttribute('aria-invalid', valid ? 'false' : 'true');
-  input.style.color=valid ? '' : 'red';
+  error.style.display=valid ? 'none' : 'block';
   calculateButton.disabled=!valid;
-
-  if(!valid){
-    resultsError.textContent=marginError;
-  } else if(resultsError.textContent === marginError){
-    resultsError.textContent='';
-  }
 
   updateProductTotals();
   return valid;
@@ -204,7 +198,7 @@ function getValidCubicMargin(){
   const input=document.getElementById('cubic_margin_percent');
   if(!validateCubicMargin()){
     input.focus();
-    throw new Error('Cubic Margin must have a value between 0 and 20.');
+    throw new Error('Use 0–20');
   }
   return input.value.trim() === '' ? 0 : Number(input.value);
 }

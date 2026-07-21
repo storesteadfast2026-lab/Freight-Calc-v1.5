@@ -42,8 +42,12 @@
       <label>Use Preselected SKU Mode
         <select id="preselect_sku"><option>YES</option><option>NO</option></select>
       </label>
-      <label>Cubic Margin (%) *
-        <input id="cubic_margin_percent" type="number" min="0" max="20" step="1" placeholder="0–20" inputmode="numeric" aria-label="Cubic Margin percentage">
+      <label>Cubic Margin *
+        <select id="cubic_margin_percent">
+          <option value="0">0% - No margin</option>
+          <option value="10">10% - Standard packing margin</option>
+          <option value="15">15% - Conservative packing margin</option>
+        </select>
       </label>
     </div>
   </section>
@@ -77,10 +81,11 @@
     The calculated cubic volume may also increase when multiple items are packed together.
     </div>
     <div class="pricing-note">
-    * Cubic Margin increases the visible product cubic volume before freight rates are calculated.
+    * Select a % margin of error to account for additional packing volume.
     </div>
      <div class="pricing-note">
-    ** Freight Calculator preliminary version - v0.1
+    ** Freight Calculator preliminary version - v0.1<br>
+    ** CubicMargin option is not WORKING
     </div>
   </section>
 </main>
@@ -133,10 +138,7 @@ function updateProductTotals(){
   });
 
   const totalWeight = productWeight + (palletCount > 0.99 ? palletCount * PALLET_WEIGHT_KG : 0);
-  const marginInput = document.getElementById('cubic_margin_percent');
-  const marginPercent = Number.isInteger(Number(marginInput.value)) ? Number(marginInput.value) : 0;
-  const adjustedProductCubic = productCubic * (1 + (marginPercent / 100));
-  const totalCubic = Math.ceil((adjustedProductCubic - Number.EPSILON) * 1000) / 1000;
+  const totalCubic = productCubic;
 
   document.getElementById('total_weight').value = formatNumber(totalWeight);
   document.getElementById('total_cubic').value = formatNumber(totalCubic, 3);
@@ -156,32 +158,6 @@ function addLine(){
   updateProductTotals();
 }
 
-function validateCubicMargin(){
-  const input=document.getElementById('cubic_margin_percent');
-  const resultsError=document.getElementById('error');
-  const calculateButton=document.querySelector('button.primary');
-  const raw=input.value.trim();
-  const value=Number(raw);
-  const marginError='Cubic Margin must have a value between 0 and 20.';
-  const valid=raw === '' || (Number.isInteger(value) && value >= 0 && value <= 20);
-
-  input.setCustomValidity(valid ? '' : marginError);
-  input.setAttribute('aria-invalid', valid ? 'false' : 'true');
-  input.style.color=valid ? '' : 'red';
-  calculateButton.disabled=!valid;
-
-  if(!valid){
-    resultsError.textContent=marginError;
-  } else if(resultsError.textContent === marginError){
-    resultsError.textContent='';
-  }
-
-  updateProductTotals();
-  return valid;
-}
-
-document.getElementById('cubic_margin_percent').addEventListener('input', validateCubicMargin);
-document.getElementById('cubic_margin_percent').addEventListener('blur', validateCubicMargin);
 async function productSearch(input, force=false){
   const q=input.value.trim(); const dd=input.parentElement.querySelector('.product_dd');
   if(!force && q.length<2){dd.innerHTML='';return;}
@@ -200,35 +176,19 @@ function pickProduct(btn,p){
   btn.parentElement.innerHTML='';
   updateProductTotals();
 }
-function getValidCubicMargin(){
-  const input=document.getElementById('cubic_margin_percent');
-  if(!validateCubicMargin()){
-    input.focus();
-    throw new Error('Cubic Margin must have a value between 0 and 20.');
-  }
-  return input.value.trim() === '' ? 0 : Number(input.value);
-}
 async function calculate(){
   const status=document.getElementById('calc_status');
   const error=document.getElementById('error');
   const tbody=document.querySelector('#results tbody');
   const button=document.querySelector('button.primary');
+  status.textContent='Calculating freight...';
   error.textContent='';
   tbody.innerHTML='';
-  let cubicMargin;
-  try{
-    cubicMargin=getValidCubicMargin();
-  } catch(e){
-    status.textContent='';
-    error.textContent=e.message;
-    return;
-  }
-  status.textContent='Calculating freight...';
   button.disabled=true;
   try{
     const rows=[...document.querySelectorAll('#lines tbody tr')];
     const lines=rows.map(tr=>({sku:tr.querySelector('.sku').value,quantity:tr.querySelector('.qty').value,freight_type:tr.querySelector('.ftype').value,length_m:tr.querySelector('.len').value,width_m:tr.querySelector('.wid').value,height_m:tr.querySelector('.hei').value,weight_kg:tr.querySelector('.weight').value,cubic_m3:tr.querySelector('.cubic').value}));
-    const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,cubic_margin_percent:cubicMargin,lines};
+    const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,cubic_margin_percent:document.getElementById('cubic_margin_percent').value,lines};
     const resp=await fetch('/api/calculate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},credentials:'same-origin',body:JSON.stringify(payload)});
     
     let data;
