@@ -62,3 +62,14 @@ label{position:relative}.dropdown{left:0;right:auto;top:100%;box-sizing:border-b
   border-left: 4px solid #98a2b3;
   border-radius: 8px;
 }
+/* User access Version 1 */
+.user-access-card{padding:12px 16px}
+.user-access-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.user-access-summary>div:first-child{display:flex;flex-direction:column;gap:2px}
+.user-access-actions{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+.user-access-actions form{margin:0}
+.user-access-actions label{margin:0;min-width:220px}
+.client-badge{display:inline-flex;align-items:center;min-height:36px;padding:7px 12px;border:1px solid #d0d5dd;border-radius:8px;background:#f8fafc}
+.login-page{max-width:520px;margin:0 auto}
+.login-card form{display:grid;gap:14px}
+.login-card button{justify-self:start}

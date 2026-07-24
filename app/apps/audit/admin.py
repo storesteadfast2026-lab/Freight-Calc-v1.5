@@ -30,7 +30,7 @@ class AuditEventAdmin(admin.ModelAdmin):
         return False
 
     def has_view_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_staff
+        return super().has_view_permission(request, obj)
 
     def has_change_permission(self, request, obj=None):
         return False

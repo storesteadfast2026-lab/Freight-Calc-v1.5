@@ -7,6 +7,7 @@
 | `Calculator!E7` | resolved postcode from `Suburb` model |
 | `Calculator!E11` | request.tailgate |
 | `Calculator!C13` | request.preselect_sku |
+| No equivalent Excel input | `FreightRequest.cubic_margin_percent` (`Cubic Margin`, web-only) |
 | `Calculator!C15:D22` | selected product lines |
 | `SKUs` | `Product` model |
 | `SUBURBS` | `Suburb` model |
@@ -33,3 +34,9 @@ Observed correction:
 | `TEAMEX ROAD`, chargeable weight 2075 kg | `WeightBrk = 3` | `WeightBrk = 4` | `WeightBrk = 3` |
 
 Carriers without an Excel break formula for the active `BrokerTotals` row use blank `WeightBrk`, matching the blank `RATES` key used by carriers such as `STEA`, `COCHRN`, and `KTI`.
+
+## Cubic Margin — web-only extension
+
+`Cubic Margin` has no confirmed input cell or business-rule equivalent in the official workbook. It is an application extension. The default value is 0%, preserving the original Excel parity path.
+
+The backend applies the margin only to customer-visible/product cubic, rounds upward to three decimals, and then adds the pallet rating allowance back unchanged. Weight and pallet count are not increased.

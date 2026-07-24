@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
@@ -52,6 +53,11 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
     search_fields = ('original_filename', 'stored_path', 'sha256', 'source_url')
     date_hierarchy = 'uploaded_at'
     ordering = ('-uploaded_at',)
+
+    @staticmethod
+    def _require_permission(request, permission):
+        if not request.user.has_perm(permission):
+            raise PermissionDenied(f'Missing permission: {permission}')
 
     def get_urls(self):
         custom_urls = [
@@ -503,6 +509,7 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
         raise SourceImportError('This file is not a product or stock reference source.')
 
     def validate_reference_source_view(self, request, object_id):
+        self._require_permission(request, 'imports.validate_external_data_file')
         obj = get_object_or_404(
             ExternalDataFile,
             pk=object_id,
@@ -569,6 +576,7 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
         return TemplateResponse(request, 'admin/imports/externaldatafile/fetch_fuel.html', context)
 
     def validate_fuel_view(self, request, object_id):
+        self._require_permission(request, 'imports.validate_external_data_file')
         obj = get_object_or_404(ExternalDataFile, pk=object_id, file_type='FUEL')
         if request.method == 'POST':
             try:
@@ -591,6 +599,7 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
         )
 
     def activate_fuel_view(self, request, object_id):
+        self._require_permission(request, 'imports.activate_fuel')
         obj = get_object_or_404(ExternalDataFile, pk=object_id, file_type='FUEL')
         form = FuelActivationForm(request.POST or None, user=request.user)
         if request.method == 'POST' and form.is_valid():
@@ -621,6 +630,7 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
         )
 
     def rollback_fuel_view(self, request, object_id):
+        self._require_permission(request, 'imports.rollback_fuel')
         obj = get_object_or_404(ExternalDataFile, pk=object_id, file_type='FUEL')
         form = FuelRollbackForm(request.POST or None)
         if request.method == 'POST' and form.is_valid():
@@ -662,6 +672,7 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
         return TemplateResponse(request, 'admin/imports/externaldatafile/fuel_action.html', context)
 
     def download_view(self, request, object_id):
+        self._require_permission(request, 'imports.download_external_data_file')
         obj = get_object_or_404(ExternalDataFile, pk=object_id)
         if obj.uploaded_file:
             try:
@@ -698,7 +709,7 @@ class ReadOnlySourceRowAdmin(admin.ModelAdmin):
         return False
 
     def has_view_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_staff
+        return super().has_view_permission(request, obj)
 
 
 @admin.register(ProductSourceRow)

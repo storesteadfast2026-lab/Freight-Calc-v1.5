@@ -3,15 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>STH Freight Calculator</title>
+  <title>{{ client.code }} Freight Calculator</title>
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
 <main class="page">
+  <section class="card user-access-card">
+    <div class="user-access-summary">
+      <div>
+        <strong>{{ request.user.email|default:request.user.username }}</strong>
+        <span class="muted">{{ user_role_label }}</span>
+      </div>
+      <div class="user-access-actions">
+        {% if can_select_client %}
+          <label>Client
+            <select id="active_client" onchange="changeActiveClient(this.value)">
+              {% for available_client in allowed_clients %}
+                <option value="{{ available_client.code }}" {% if available_client.id == client.id %}selected{% endif %}>
+                  {{ available_client.code }} — {{ available_client.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+        {% else %}
+          <span class="client-badge">{{ client.code }} — {{ client.name }}</span>
+        {% endif %}
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit">Sign out</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
   <section class="card calculator-card">
     <div class="calculator-header">
       <h1>Freight Calculator</h1>
-      <p class="muted">STH / Steadfast Freight Calculator migration</p>
+      <p class="muted">{{ client.code }} / Steadfast Freight Calculator</p>
     </div>
     <div class="grid calculator-grid">
       <label>From Address
@@ -85,6 +113,8 @@
   </section>
 </main>
 <script>
+const CURRENT_CLIENT_CODE = '{{ client.code|escapejs }}';
+function changeActiveClient(clientCode){ window.location.href = `/?client=${encodeURIComponent(clientCode)}`; }
 const PALLET_WEIGHT_KG = Number('{{ pallet_weight_kg|default:"32.5" }}');
 const PALLET_CUBIC_M3 = Number('{{ pallet_cubic_m3|default:"0.02" }}');
 function debounce(fn, ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
@@ -185,7 +215,7 @@ document.getElementById('cubic_margin_percent').addEventListener('blur', validat
 async function productSearch(input, force=false){
   const q=input.value.trim(); const dd=input.parentElement.querySelector('.product_dd');
   if(!force && q.length<2){dd.innerHTML='';return;}
-  const res=await fetch(`/api/products/?client=STH&q=${encodeURIComponent(q)}`).then(r=>r.json());
+  const res=await fetch(`/api/products/?client=${encodeURIComponent(CURRENT_CLIENT_CODE)}&q=${encodeURIComponent(q)}`).then(r=>r.json());
   dd.innerHTML=res.results.length ? res.results.map(p=>`<button type="button" onclick='pickProduct(this, ${JSON.stringify(p)})'>${p.label}</button>`).join('') : '<span class="no-results">No products loaded or no matches found</span>';
 }
 function pickProduct(btn,p){
@@ -228,7 +258,7 @@ async function calculate(){
   try{
     const rows=[...document.querySelectorAll('#lines tbody tr')];
     const lines=rows.map(tr=>({sku:tr.querySelector('.sku').value,quantity:tr.querySelector('.qty').value,freight_type:tr.querySelector('.ftype').value,length_m:tr.querySelector('.len').value,width_m:tr.querySelector('.wid').value,height_m:tr.querySelector('.hei').value,weight_kg:tr.querySelector('.weight').value,cubic_m3:tr.querySelector('.cubic').value}));
-    const payload={client_code:'STH',from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,cubic_margin_percent:cubicMargin,lines};
+    const payload={client_code:CURRENT_CLIENT_CODE,from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,cubic_margin_percent:cubicMargin,lines};
     const resp=await fetch('/api/calculate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},credentials:'same-origin',body:JSON.stringify(payload)});
     
     let data;

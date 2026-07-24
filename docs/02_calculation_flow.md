@@ -9,17 +9,53 @@
    - cartons
    - total weight
    - total cubic
-5. Apply validation equivalent to `CalcLines!D3:L3`.
-6. Iterate over configured carrier/service rows.
-7. Resolve zone using `ZONES` equivalent.
-8. Calculate chargeable weight: `max(actual weight, cubic * cubic conversion)`, equivalent to `BrokerTotals!AF`.
-9. Resolve the `WeightBrk` value using the carrier-specific formulas from `BrokerTotals!AI:AO`.
-10. Resolve rate using `RATES` equivalent and the Excel-like key components: carrier, service, zone, subzone, area, `WeightBrk`, customer, and freight type.
-11. Calculate base freight.
-12. Calculate tailgate or hand unload.
-13. Calculate fuel surcharge.
-14. Calculate final estimate ex GST.
-15. Sort results from cheapest to most expensive.
+5. Apply optional web-only `Cubic Margin` to visible/product cubic and add pallet cubic back unchanged.
+6. Apply validation equivalent to `CalcLines!D3:L3`.
+7. Iterate over configured carrier/service rows.
+8. Resolve zone using `ZONES` equivalent.
+9. Calculate chargeable weight: `max(actual weight, cubic * cubic conversion)`, equivalent to `BrokerTotals!AF`.
+10. Resolve the `WeightBrk` value using the carrier-specific formulas from `BrokerTotals!AI:AO`.
+11. Resolve rate using `RATES` equivalent and the Excel-like key components: carrier, service, zone, subzone, area, `WeightBrk`, customer, and freight type.
+12. Calculate base freight.
+13. Calculate tailgate or hand unload.
+14. Calculate fuel surcharge.
+15. Calculate final estimate ex GST.
+16. Sort results from cheapest to most expensive.
+
+
+## Cubic Margin — application-only rule
+
+`Cubic Margin` is not a confirmed Excel rule. It is a web extension applied after line consolidation and before carrier rating.
+
+Input contract:
+
+```text
+blank = 0
+allowed = whole numbers from 0 to 20
+decimals, negative values and values above 20 = validation error
+```
+
+Backend formula:
+
+```text
+pallet_cubic = pallet_count × 0.02, only when pallet_count > 0.99
+visible_cubic = consolidated_rating_cubic - pallet_cubic
+adjusted_visible_cubic = ROUND_UP(visible_cubic × (1 + margin_percent/100), 3)
+adjusted_rating_cubic = ROUND_UP(adjusted_visible_cubic + pallet_cubic, 3)
+```
+
+Example:
+
+```text
+Original rating cubic: 4.040
+Pallets: 2 → pallet cubic 0.040
+Original visible cubic: 4.000
+Margin: 10%
+Adjusted visible cubic: 4.400
+Adjusted rating cubic: 4.440
+```
+
+The margin does not change actual weight, pallet count, carton count or maximum length. At 0%, the original consolidated object is preserved, so standard Excel-vs-Django cases remain unchanged. Non-zero margin needs its own web-rule tests rather than being claimed as direct Excel parity.
 
 ## Carrier-specific WeightBrk logic
 
@@ -110,3 +146,9 @@ fuel.csv from official URL or Admin upload
 ```
 
 Legacy workbook values remain a bootstrap/fixed-baseline mechanism. When an Admin fuel dataset is active, normal workbook imports reapply it after rebuilding carrier configs.
+
+## Authentication boundary — 2026-07-22
+
+Authentication does not alter the freight formula. Before `FreightCalculatorService.calculate()` is called, the web layer resolves an authorized Client from the authenticated user's profile. The service receives that server-approved `client.code` in `FreightRequest.client_code`.
+
+This change must not modify consolidation, zone resolution, rate selection, surcharge, fuel, uprate or display rounding behavior. Existing Excel-vs-Django batteries remain the functional regression authority.

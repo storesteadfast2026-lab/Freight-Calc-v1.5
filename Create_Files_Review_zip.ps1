@@ -25,13 +25,13 @@
   La inclusion de archivos Excel es controlada: solo se buscan los tres archivos de referencia conocidos.
 
 .EXAMPLE
-  .\Create_Files_Review_zip_0721.1305.ps1
+  .\Create_Files_Review_zip.ps1
 
 .EXAMPLE
-  .\Create_Files_Review_zip_0721.1305.ps1 -SkipTests
+  .\Create_Files_Review_zip.ps1 -SkipTests
 
 .EXAMPLE
-  .\Create_Files_Review_zip_0721.1305.ps1 -SkipReferenceFiles -SkipReports
+  .\Create_Files_Review_zip.ps1 -SkipReferenceFiles -SkipReports
 #>
 
 [CmdletBinding()]
@@ -194,7 +194,7 @@ New-Item -ItemType Directory -Path $WorkPath -Force | Out-Null
 
 Write-Section "2. Copying source code and documentation"
 
-$folders = @("app", "tools", "docs", "scripts", "tests")
+$folders = @("app", "tools", "docs", "business_rules", "decisions", "scripts", "tests")
 if (!$SkipReports) {
     $folders += "reports"
 }
@@ -265,6 +265,20 @@ $filesToRemove = Get-ChildItem -Path $WorkPath -Recurse -File -Force -ErrorActio
 foreach ($file in $filesToRemove) {
     Write-Host "Removing file: $($file.FullName)" -ForegroundColor DarkYellow
     Remove-TrackedItem -Item $file -Reason "Binary, generated, database, secret, backup, archive, or non-controlled spreadsheet"
+}
+
+$backupNamedFiles = Get-ChildItem -Path $WorkPath -Recurse -File -Force -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.Name -match '\.bak($|[._-])' -or
+        $_.Name -match '^backup[._-]' -or
+        $_.Name -match '[._-]backup[._-]'
+    }
+
+foreach ($file in $backupNamedFiles) {
+    if (Test-Path -LiteralPath $file.FullName) {
+        Write-Host "Removing backup-named file: $($file.FullName)" -ForegroundColor DarkYellow
+        Remove-TrackedItem -Item $file -Reason "Local backup file"
+    }
 }
 
 $sensitiveFiles = Get-ChildItem -Path $WorkPath -Recurse -File -Force -ErrorAction SilentlyContinue |

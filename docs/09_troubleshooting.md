@@ -4,21 +4,19 @@
 
 This error means the PostgreSQL database was started without Django migrations for the project apps.
 
-Fix:
+Safe first fix:
 
-```bash
-docker compose down -v
-docker compose build --no-cache
-docker compose up
-```
-
-If you do not want to remove the database volume, run:
-
-```bash
+```powershell
+docker compose up -d db web
+docker compose exec web python manage.py showmigrations
 docker compose exec web python manage.py migrate --noinput
 ```
 
-The project now includes initial migrations for all custom apps.
+Then re-run the relevant import and `manage.py check`.
+
+Do not use `docker compose down -v` as the first response. The `-v` option deletes the PostgreSQL volume and its data. Use it only when you intentionally want to recreate a disposable environment and have confirmed that no database data must be retained.
+
+The project includes initial migrations for all custom apps.
 
 ## TEAMEX does not match Excel while STEA, COCHRN, and KTI match
 
@@ -103,12 +101,14 @@ Fix:
 
 `calculator.py` now contains a specific branch for `TEAMTAS GENERAL` that mirrors the workbook row logic.
 
-Validation after fix:
+Historical validation recorded after the fix:
 
 ```text
 random_current 15 cases: 36 OK / 0 FAIL
 live_latest 20 cases: 97 OK / 0 FAIL
 ```
+
+In the 2026-07-22 review package, only the `live_latest` result remains directly reproducible. The current `random_current` evidence set is incomplete; see `docs/12_validation_findings_log.md`.
 
 ## Fetch fuel from source fails
 
@@ -220,4 +220,104 @@ Expected result:
 ```text
 Ran 6 tests
 OK
+```
+
+## Product/Stock upload says source products are not in Django
+
+This is a comparison result, not an automatic import failure.
+
+`product_sth.xlsx` and `stock_sth.xlsx` are reference-only sources. Validation compares their normalized SKUs with the operational `Product` table but does not create or modify Products.
+
+Confirm the validation summary contains:
+
+```text
+Reference only: Yes
+Operational tables updated: No
+```
+
+Review source rows in:
+
+```text
+Imports → Product source rows
+Imports → Stock source rows
+```
+
+## Product/Stock upload is detected as duplicate
+
+The SHA-256 hash matches an earlier file for the same client and file type. The current code records a warning and points to the prior file ID; it does not silently merge source rows into operational data.
+
+## Product/Stock Admin buttons are missing
+
+Confirm migration and active code/template:
+
+```powershell
+docker compose exec web python manage.py showmigrations imports
+docker compose exec web python manage.py check
+```
+
+Expected migration:
+
+```text
+[X] 0003_product_stock_reference_sources
+```
+
+Then rebuild/restart the web service:
+
+```powershell
+docker compose up -d --build web
+```
+
+## Calculator authentication appears enabled but the page is still public
+
+`CALCULATOR_REQUIRE_AUTH=1` currently affects only the middleware check for `/api/` paths. It does not protect `/` and does not authenticate a Django user.
+
+Do not treat `ExternalAuthMiddleware` as complete login. Implement the session-based access plan in `docs/16_user_access_review_and_plan.md`.
+
+## Staff user can access more Admin operations than expected
+
+Several custom import actions and read-only Admin views currently rely broadly on `is_staff`. Until explicit action/model permissions are added, grant `is_staff=True` only to fully trusted operational administrators.
+
+## User access troubleshooting — 2026-07-22
+
+### Calculator redirects to login
+
+Expected for anonymous users. Create a profile-backed user and sign in at `/accounts/login/`.
+
+### HTTP 403: no calculator access profile
+
+The Django user exists but does not have `CalculatorUserProfile`, or `calculator_access` is disabled.
+
+### HTTP 403 when changing client
+
+Expected when the requested client is outside the user's single/selected scope. Do not fix this by trusting the browser value; correct the profile assignment.
+
+### Staff user receives HTTP 403 in Django Admin
+
+A normal administrator must meet all conditions:
+
+```text
+is_staff=True
+Internal User
+ALL_CLIENTS
+calculator_access=True
+member of Django Administrator
+```
+
+Run `setup_access_roles`, then create or correct the user through a Technical Superuser.
+
+### setup_access_roles reports missing permissions
+
+Run migrations first:
+
+```powershell
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py setup_access_roles
+```
+
+### User cannot log in after command creation
+
+Without `--set-password`, the command intentionally creates an unusable password. Set one securely:
+
+```powershell
+docker compose exec -it web python manage.py changepassword user@example.com
 ```

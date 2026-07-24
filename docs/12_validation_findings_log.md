@@ -85,7 +85,7 @@ Do not mix:
 
 Doing so can produce false failures even when Django calculation logic is correct.
 
-### Final validation results
+### Historical validation results recorded on 2026-07-14
 
 Real 20-case battery:
 
@@ -107,13 +107,13 @@ OK rows: 36
 FAIL rows: 0
 ```
 
-### Current status
+### Status interpretation
 
 ```text
-TEAMTAS GENERAL: fixed
-live_latest: passing
-random_current: passing
-Excel-Django validation workflow: healthy
+TEAMTAS GENERAL: fixed in documented code and covered by historical regression
+live_latest: passing in the report included with the 2026-07-22 package
+random_current: historical passing result only; current package evidence incomplete
+Excel-Django workflow: valid when CSVs and their matching workbook baseline remain paired
 ```
 
 ## Earlier confirmed findings
@@ -172,3 +172,58 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 - **Data impact:** none.
 - **Calculation impact:** none.
 - **Migration required:** no.
+
+## 2026-07-22 — Product/Stock reference imports confirmed in current code
+
+- **Status:** Implemented, documentation updated.
+- **Files:** `product_sth.xlsx` and `stock_sth.xlsx`.
+- **Behavior:** upload, SHA-256, validation, audit and isolated source-row storage.
+- **Operational impact:** none; `Product`, `FreightRate`, `FreightZone`, `ClientCarrierConfig` and calculation code are not updated.
+- **Duplicate behavior:** Product duplicate SKUs inside one file fail validation; Stock duplicate SKUs are preserved with a warning; duplicate file content is reported.
+- **Activation:** Product/Stock files have no Activate or Rollback operation.
+- **Evidence:** migration `imports.0003_product_stock_reference_sources`, service code and 6 Product/Stock tests.
+
+## 2026-07-22 — Review package runtime diagnostics incomplete
+
+- **Django check:** passed.
+- **Migrations:** all listed migrations applied.
+- **Complete suite:** not confirmed; capture stopped at test-database creation.
+- **Database summary:** not confirmed; generated `manage.py shell -c` command was malformed.
+- **Required action:** rerun targeted tests and row-count commands from `docs/11_validation_runbook.md`.
+
+## 2026-07-22 — User/access proposal review
+
+- **Historical status:** This review identified that calculator endpoints lacked user/client scope and custom Admin actions relied too broadly on `is_staff`.
+- **Decision:** Keep only Customer User and Internal User calculator roles; keep Django Admin separate.
+- **Correction to Codex draft:** quotation visibility/draft/finalization/PDF/email rules remain pending because no persisted Quotation model exists.
+- **Implemented outcome:** one `Django Administrator` group, Technical Superusers, calculator profiles, backend client authorization and explicit import-action permissions.
+
+## 2026-07-22 — random_current evidence set incomplete in review package
+
+- **Expected contract:** fixed `random_current` directories and fixed filenames for cases, outputs, components and report.
+- **Observed:** `app/apps/freight/fixtures/random_current/sth_excel_random_cases.csv` contains 5 cases.
+- **Missing:** random outputs, random components, matching baseline under `sample_data/live_baselines/random_current/` and comparison report under `reports/random_current/`.
+- **Legacy artifacts:** `random_5` and `random_30` directories still exist and conflict with the current no-count-folder rule.
+- **Conclusion:** do not report `random_current` as currently passing from this package. Preserve the old 15-case/36-OK result as historical evidence and regenerate a complete fixed-folder set before the next calculation change.
+- **Runbook:** follow `docs/11_validation_runbook.md`.
+
+## 2026-07-22 — Cubic Margin manual code change reviewed
+
+- **Status:** Implemented in current code; runtime suite result not captured in the review ZIP.
+- **Commit evidence:** Git metadata identifies commit `0444bb2` with the Cubic Margin implementation.
+- **Range:** blank/0 or whole numbers 1–20; negative, decimal and >20 values are rejected in frontend and backend.
+- **Formula:** apply the percentage to visible/product cubic, round upward to 3 decimals, then add pallet cubic back unchanged.
+- **Order:** consolidation → Cubic Margin → consolidated validation → carrier rating.
+- **Excel status:** `WEB_ONLY`; no equivalent input has been confirmed in the workbook. Default 0% preserves Excel parity.
+- **Tests present:** 7 tests in `test_cubic_margin.py`; rerun them in Docker and then rerun the 0% Excel battery.
+- **Calculation risk:** non-zero margin intentionally changes chargeable cubic and potentially carrier estimates; it must not be included silently in Excel-parity fixtures.
+
+## 2026-07-22 — User access Version 1
+
+- **Finding:** Calculator and APIs were public and accepted browser-supplied client identifiers.
+- **Resolution:** Added session authentication, calculator profiles and centralized backend client authorization.
+- **Finding:** Django `is_staff` was sufficient for several custom import/audit views.
+- **Resolution:** Added minimum administrator middleware and explicit permissions for validate, activate, rollback and download operations.
+- **Finding:** Codex proposal included quotation actions that have no current persistent model.
+- **Resolution:** Quotation permissions remain pending and were not implemented.
+- **Verification status:** New tests were authored. Full execution must be completed in Docker because the review environment did not contain Django or Docker.

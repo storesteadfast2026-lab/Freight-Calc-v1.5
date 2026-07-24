@@ -116,6 +116,12 @@ class ExternalDataFile(models.Model):
 
     class Meta:
         ordering = ['-uploaded_at']
+        permissions = [
+            ('validate_external_data_file', 'Can validate external data files'),
+            ('activate_fuel', 'Can activate fuel rates'),
+            ('rollback_fuel', 'Can rollback fuel rates'),
+            ('download_external_data_file', 'Can download external data files'),
+        ]
 
     def __str__(self):
         return f'{self.client.code} {self.file_type} {self.original_filename}'

@@ -1,6 +1,6 @@
 # Diccionario de configuración de Django Admin
 
-**Versión:** 0717.0811
+**Versión:** 0722.1350
 
 Este documento explica qué representa cada sección de administración, de dónde proviene y qué efecto tiene actualmente.
 
@@ -18,6 +18,9 @@ Este documento explica qué representa cada sección de administración, de dón
 | Rates > Freight rates | FreightRate | Filas tarifarias y cargos. | zone/subzone/area, weight_break, freight_type, customer_code, minimum/basic/subsequent/per_kg | RATES. | Calcula freight_base y varios extras. | margin y overlength_charge no se usan actualmente; conservar precisión de 6 decimales. | RATE-KEY-001 a RATE-MARGIN-001 |
 | Rates > Carrier tailgate charges | CarrierTailgateCharge | Importes de tailgate y hand unload por cliente/carrier. | minimum_charge, per_subsequent_charge, hand_unload_charge | SettingFlags filas 34:52. | Calcula cargo con pallets. | La configuración es por carrier, no por service. | TAIL-MIN-001, TAIL-PER-001, HAND-AMT-001 |
 | Audit > Audit events | AuditEvent | Registro de auditoría inmutable para operaciones del sistema. | actor, client, external_file, event_type, severity, message, metadata, ip_address, request_id, created_at | Ninguno. | Los servicios de fuel crean eventos automáticos de fetch/upload/validación/activación/fallo/rollback. | La pantalla es de solo lectura y no permite crear ni borrar eventos desde Admin. | AUDIT-001, FUEL-SRC-001, FUEL-ROLL-001 |
+| Imports > External data files | ExternalDataFile | Registro y archivo de fuentes externas por cliente. | file_type, source_method, uploaded_file, sha256, status, validation_summary, actors/timestamps | product_sth.xlsx, stock_sth.xlsx, fuel.csv | Centraliza carga, validación, auditoría y, solo para Fuel, activación/rollback. | Product/Stock son referencia; Fuel puede cambiar fuel_levy. No borrar historial. | IMP-EXT-001 |
+| Imports > Product source rows | ProductSourceRow | Filas validadas de product_sth.xlsx para referencia y comparación. | product_code, dimensiones, cubic, quantity, weight, pallet, status, raw_data | product_sth.xlsx | No participa en autocomplete ni cálculo; no modifica Product. | Vista de solo lectura; duplicados internos de SKU fallan validación. | IMP-PROD-001 |
+| Imports > Stock source rows | StockSourceRow | Filas validadas de stock_sth.xlsx para referencia. | movement, product_code, quantity, pallet, weight, cubic, location, status, raw_data | stock_sth.xlsx | No participa en cálculo ni modifica Product. | Vista de solo lectura; SKU repetido se conserva porque puede representar movimientos múltiples. | IMP-STOCK-001 |
 
 ## Regla de modificación
 
@@ -41,3 +44,55 @@ Antes de cambiar un registro importado desde Excel:
 | Active external data file | Rollback | Restores values recorded before activation |
 | Carriers → Client carrier configs | Fuel levy source / updated at / data file | Read-only provenance of the operational value |
 | Audit → Audit events | Read-only event history | Records actor, client, file, event, severity, IP, request ID and metadata |
+
+## Product and Stock controls added 2026-07-20
+
+| Admin location | Control | Effect |
+|---|---|---|
+| Imports → External data files | Upload product source | Uploads and immediately validates `product_sth.xlsx` into ProductSourceRow |
+| Imports → External data files | Upload stock source | Uploads and immediately validates `stock_sth.xlsx` into StockSourceRow |
+| Product/Stock external file | Validate | Rebuilds isolated source rows for that file; no operational data change |
+| Product/Stock external file | View rows | Opens the read-only staging rows filtered by source file |
+| Product/Stock external file | Download | Downloads the stored source snapshot |
+
+Product/Stock rows must never show `Activate` or `Rollback`.
+
+## Minimum user and Django Admin implementation
+
+| Concept | Version 1 behavior |
+|---|---|
+| Customer User | Calculator role; exactly one active client; never staff |
+| Internal User | Calculator role; all or selected active clients |
+| Django Administrator | Internal User with ALL_CLIENTS, `is_staff` and approved group membership |
+| Technical superuser | Exceptional native Django superuser account, not a calculator role |
+
+Sensitive Fuel and source operations now require explicit permissions. Django Administrator membership, Django Group records, Permission records and superuser status remain controlled by Technical Superusers to avoid privilege escalation.
+
+## User and permission configuration — 2026-07-22
+
+### Calculator User Profiles
+
+Visible only to Technical Superusers. Normal Django Administrators cannot create or change profiles in Version 1.
+
+### Django Administrator group
+
+Created idempotently with:
+
+```powershell
+docker compose exec web python manage.py setup_access_roles
+```
+
+It grants view/add/change for current operational configuration models, view-only access to audit/source rows and custom import-action permissions. It does not grant auth User, Group or Permission management.
+
+### ExternalDataFile custom permissions
+
+| Permission | Operation |
+|---|---|
+| `validate_external_data_file` | Validate Product, Stock or Fuel source |
+| `activate_fuel` | Apply validated Fuel rates |
+| `rollback_fuel` | Restore values before an activation |
+| `download_external_data_file` | Download stored source file |
+
+### Technical Superuser
+
+Created with Django `createsuperuser`. Use only for user/profile/group administration, recovery and exceptional technical operations.

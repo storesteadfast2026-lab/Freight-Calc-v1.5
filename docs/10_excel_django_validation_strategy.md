@@ -60,7 +60,7 @@ app/apps/freight/fixtures/random_current/
 reports/random_current/sth_excel_random_comparison_report.csv
 ```
 
-Current confirmed 15-case result:
+Historical documented result:
 
 ```text
 Cases run: 15
@@ -69,6 +69,10 @@ Report rows: 36
 OK rows: 36
 FAIL rows: 0
 ```
+
+This historical result is not reproducible from the 2026-07-22 review package. The package contains only `sth_excel_random_cases.csv` with 5 cases under `random_current`; the matching outputs, components, Excel baseline and report are absent. Regenerate all four artifacts together before calling the current random battery passing.
+
+The only supported random workspace is `random_current`. Do not create or use `random_5`, `random_10`, `random_30` or similar folders for future runs; legacy folders in the repository should be treated as deprecated evidence.
 
 ## Baseline pairing rule
 
@@ -99,3 +103,25 @@ Example:
 The battery compares component totals separately from carrier ranked outputs. This matters because Excel may generate no carrier for a case while still showing total weight/cubic components.
 
 When no carrier is generated, Django uses `consolidate_lines()` as a fallback for component comparison.
+
+## Fixed random_current contract
+
+Use only these directories:
+
+```text
+app/apps/freight/fixtures/random_current/
+generated_excel_baselines/random_current/
+sample_data/live_baselines/random_current/
+reports/random_current/
+```
+
+Use only these published CSV names:
+
+```text
+sth_excel_random_cases.csv
+sth_excel_random_outputs.csv
+sth_excel_random_components.csv
+sth_excel_random_comparison_report.csv
+```
+
+The cases, outputs, components, report and Excel baseline form one versioned evidence set even though the directory names remain fixed.

@@ -1,34 +1,137 @@
 # External File Imports
 
-## Current sources
+## 1. Import channels
 
-The original Excel workbook references these external sources:
+The project has two different import concepts. They must not be mixed.
 
-- `product_sth.xlsx`
-- `stock_sth.xlsx`
-- `https://www.poscat.com.au/fuelsc/fuel.csv`
-- the full workbook tables for SKUs, suburbs, zones and rates
+### 1.1 Full calculator workbook
 
-The workbook command remains available for the base datasets:
+The official workbook is imported by management command and supplies the operational base datasets used by the calculator:
 
 ```powershell
 docker compose exec web python manage.py import_sth_excel /app/sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx --client STH --replace
 ```
 
-## Fuel source ownership
+This channel loads workbook tables such as SKUs, suburbs, carrier configuration, zones, rates and workbook/bootstrap fuel.
 
-Fuel now has two explicit modes:
+### 1.2 Three Django Admin source files
 
-1. **Legacy workbook bootstrap**: used only when no active Admin fuel file exists, or when historical Excel validation explicitly requests `--fuel-source workbook`.
-2. **Operational Admin source**: the active `fuel.csv` downloaded/uploaded and activated in Django Admin.
+Django Admin currently accepts three external source types:
 
-Normal workbook imports use:
+| File | Type | Current effect |
+|---|---|---|
+| `product_sth.xlsx` | PRODUCTS | Reference-only staging and comparison against Django Products. |
+| `stock_sth.xlsx` | STOCK | Reference-only staging and comparison against Django Products. |
+| `fuel.csv` | FUEL | Operational fuel changes only after manual activation. |
+
+Open:
+
+```text
+Django Admin → Imports → External data files
+```
+
+## 2. Common ExternalDataFile behavior
+
+Every upload/download stores:
+
+- client;
+- file type and source method;
+- original and stored filename;
+- file size and MIME type;
+- SHA-256 content hash;
+- upload/validation actor and timestamp;
+- validation summary and status;
+- audit events.
+
+Files are stored under:
+
+```text
+/app/uploaded_data/external_imports/<client>/<file_type>/YYYY/MM/
+```
+
+Docker persists them through:
+
+```yaml
+- ./uploaded_data:/app/uploaded_data
+```
+
+Do not commit production uploads to Git.
+
+## 3. Product source — product_sth.xlsx
+
+Use:
+
+```text
+Imports → External data files → Upload product source
+```
+
+Current workflow:
+
+```text
+Upload XLSX
+→ calculate SHA-256
+→ locate product_sth/products/product worksheet
+→ map required headers by accepted aliases
+→ validate every non-empty row
+→ compare normalized SKUs with operational Product rows
+→ replace ProductSourceRow rows for this uploaded file
+→ status VALIDATED
+→ create audit event
+```
+
+Important rules:
+
+- all required Product columns must be identifiable;
+- product code is mandatory;
+- invalid numeric values reject the entire staging load;
+- duplicate product codes inside the same source are treated as validation errors;
+- duplicate file content is reported as a warning with the prior file ID;
+- empty placeholder rows are skipped;
+- the source is `reference_only=True`;
+- `operational_tables_updated=False`;
+- there is no Activate or Rollback operation.
+
+The summary reports:
+
+- valid/skipped rows;
+- duplicate SKUs;
+- Django products matched;
+- source products not in Django;
+- Django products missing from source;
+- a 25-row preview.
+
+`Source products not in Django` is a comparison finding, not a signal that products will be created automatically.
+
+## 4. Stock source — stock_sth.xlsx
+
+Use:
+
+```text
+Imports → External data files → Upload stock source
+```
+
+Current workflow is equivalent to Product source but stores `StockSourceRow` records.
+
+Important differences:
+
+- repeated product codes in Stock are allowed because multiple stock/movement rows can refer to the same SKU;
+- duplicates are preserved and reported as a warning;
+- invalid rows reject the whole staging load;
+- the summary reports Stock SKUs not present in the operational Product table;
+- the source is reference-only and has no activation or rollback.
+
+## 5. Fuel source ownership
+
+Fuel has two explicit modes:
+
+1. **Legacy workbook/bootstrap** — used when no active Admin fuel file exists, or when historical Excel validation explicitly requests workbook fuel.
+2. **Operational Admin source** — the active `fuel.csv` downloaded/uploaded and activated in Django Admin.
+
+Normal workbook imports use active Admin fuel:
 
 ```text
 --fuel-source active
 ```
-
-This imports the carrier configuration rows from `FuelSurcharge`, then reapplies the latest active Admin fuel dataset. Therefore, a later workbook `--replace` does not silently overwrite active web-managed fuel rates.
 
 Historical validation may use:
 
@@ -36,60 +139,35 @@ Historical validation may use:
 docker compose exec web python manage.py import_sth_excel <baseline.xlsx> --client STH --replace --fuel-source workbook
 ```
 
-The command `validate_excel_battery --import-workbook` selects workbook fuel during the comparison and restores the active Admin fuel dataset after a normal completed run.
+`validate_excel_battery --import-workbook` uses workbook fuel for the historical comparison and normally restores the active Admin fuel dataset afterward.
 
-## Manual fuel workflow in Django Admin
+## 6. Fuel entry paths
 
-Open:
-
-```text
-Django Admin
-→ Imports
-→ External data files
-```
-
-Two entry paths are available:
-
-### Fetch from the official source
-
-Use:
+### Fetch from official source
 
 ```text
-Fetch fuel from source
+Imports → External data files → Fetch fuel from source
 ```
 
-Django downloads:
+Default URL:
 
 ```text
 https://www.poscat.com.au/fuelsc/fuel.csv
 ```
 
-The URL can be changed with `FUEL_SOURCE_URL` in `.env`.
-
-### Upload a local CSV copy
-
-Use:
+Environment settings:
 
 ```text
-Add external data file
+FUEL_SOURCE_URL
+FUEL_FETCH_TIMEOUT_SECONDS
+FUEL_RATE_MAX
 ```
 
-Only `FUEL` and `.csv` are accepted by the Admin upload form in this release.
+### Upload local CSV
 
-## Processing stages
+Use `Add external data file`, select `FUEL`, and upload a `.csv` file.
 
-```text
-Fetch or upload
-→ store immutable file snapshot
-→ calculate SHA-256
-→ validate CSV structure and values
-→ display preview
-→ activate manually
-→ update ClientCarrierConfig.fuel_levy
-→ create AuditEvent records
-```
-
-Expected CSV columns:
+Expected columns:
 
 ```text
 master_rate,info,rate,updated,expires,warnings
@@ -102,96 +180,82 @@ fuel.csv.master_rate ↔ ClientCarrierConfig.ratecard
 fuel.csv.rate        → ClientCarrierConfig.fuel_levy
 ```
 
-Activation is transactional. If one database operation fails, all fuel changes are rolled back.
+## 7. Fuel processing and safety
 
-## Validation rules
+```text
+Fetch or upload
+→ immutable snapshot and SHA-256
+→ validate structure, values, dates, duplicates and coverage
+→ display preview
+→ activate manually
+→ update matching fuel_levy values transactionally
+→ record provenance and AuditEvent
+```
 
-The service validates:
+Validation checks include:
 
 - required columns;
-- non-empty file and data rows;
-- unique `master_rate` values;
-- numeric rates;
-- configurable range `0..FUEL_RATE_MAX`;
-- valid `updated` and `expires` dates;
-- expiry earlier than update;
-- duplicate file content by SHA-256;
-- CSV ratecards not present in Django;
-- Django ratecards missing from the CSV.
+- non-empty data;
+- unique `master_rate`;
+- numeric range;
+- valid update/expiry dates;
+- duplicate content;
+- file ratecards missing in Django;
+- Django ratecards missing in the file.
 
-An expired dataset is blocked. A superuser can force activation only with a written justification, which is stored in the audit metadata.
+Expired data is blocked unless a superuser forces activation with a written justification.
 
-## Storage
+Only the active Fuel file can be rolled back. Rollback restores the exact previous value, source and file reference recorded during activation.
 
-Files are stored under:
-
-```text
-/app/uploaded_data/external_imports/<client>/fuel/YYYY/MM/
-```
-
-Docker persists them through:
-
-```yaml
-- ./uploaded_data:/app/uploaded_data
-```
-
-Do not commit downloaded production files to Git.
-
-## Provenance fields
-
-`ClientCarrierConfig` now records:
-
-```text
-fuel_levy
-fuel_levy_source
-fuel_levy_updated_at
-fuel_data_file
-```
-
-Possible source values in this release:
-
-```text
-LEGACY_WORKBOOK
-ADMIN_WEB_FETCH
-ADMIN_UPLOAD
-```
-
-## Rollback
-
-Only the active fuel file exposes the `Rollback` operation. A reason is mandatory. The system restores the exact previous value, source and file reference recorded during activation.
-
-## Recovery command
-
-If historical validation or another controlled operation is interrupted before restoring operational fuel, run:
+Recovery command:
 
 ```powershell
 docker compose exec web python manage.py reapply_active_fuel --client STH
 ```
 
-## Fuel validation summary presentation
+## 8. Permissions warning before adding staff users
 
-The fuel validation JSON remains stored unchanged in `ExternalDataFile.validation_summary`.
-Django Admin renders it as:
+The current Product/Stock upload path checks the model add permission. However, several custom Fuel validation/activation/rollback/download views and the read-only Audit/Source-row views rely too broadly on `is_staff`.
 
-- status and count cards;
-- a carrier/service/ratecard comparison table;
-- fuel rates displayed as percentages;
-- percentage-point difference between current and proposed rates;
-- warnings and errors in separate panels;
-- matched and missing ratecard coverage;
-- raw JSON collapsed under `Show raw validation JSON`.
+Before granting Django Admin access to multiple users, add explicit permission checks for every custom Admin action and read-only model view. See `docs/16_user_access_review_and_plan.md`.
 
-This is a presentation-only change. It does not modify validation, activation, rollback,
-audit, database fields or calculation logic.
+## 9. Verification commands
 
-## Compact fuel validation presentation
+Migrations:
 
-The Admin summary prioritises operational decisions:
+```powershell
+docker compose exec web python manage.py showmigrations imports
+```
 
-- one-line validation, source dates, valid-row count and shortened SHA-256;
-- counts for changes, unchanged configurations, Django ratecards missing from the file and errors;
-- only changed carrier/service rates in the primary table;
-- missing Django ratecards and validation errors shown immediately;
-- unchanged rows, unused file ratecards, complete file metadata and raw JSON collapsed by default.
+Expected:
 
-The underlying `validation_summary` JSON, validation rules, activation and rollback logic are unchanged.
+```text
+[X] 0003_product_stock_reference_sources
+```
+
+Targeted import tests:
+
+```powershell
+docker compose exec web python manage.py test apps.imports.tests.test_fuel_import apps.imports.tests.test_product_stock_sources -v 2
+```
+
+Operational-table isolation check before and after Product/Stock uploads:
+
+```powershell
+docker compose exec web python manage.py shell -c "from apps.products.models import Product; from apps.rates.models import FreightRate,FreightZone; from apps.carriers.models import ClientCarrierConfig; print({'products':Product.objects.count(),'rates':FreightRate.objects.count(),'zones':FreightZone.objects.count(),'configs':ClientCarrierConfig.objects.count()})"
+```
+
+The counts must remain unchanged after Product/Stock reference uploads.
+
+## Import authorization update — 2026-07-22
+
+The three Django Admin source flows remain unchanged functionally, but sensitive actions now use explicit permissions:
+
+```text
+imports.validate_external_data_file
+imports.activate_fuel
+imports.rollback_fuel
+imports.download_external_data_file
+```
+
+Standard `add_externaldatafile`, `change_externaldatafile` and `view_externaldatafile` permissions continue to control upload and record access. Product and Stock validation still writes only staging rows. Fuel still changes operational configuration only after activation.

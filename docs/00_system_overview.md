@@ -18,8 +18,47 @@ The workbook calculation is distributed across:
 
 ## Web goal
 
-Build a responsive, multi-client freight calculator platform where STH is the first client implementation.
+Build one maintainable, responsive, multi-client freight calculator platform where STH is the first client implementation.
 
-## Important boundary
+## Current data-loading channels
 
-Login, multi-client administration and FROM address configuration are new web requirements. They are not existing Excel logic.
+The project currently has two distinct loading channels:
+
+1. **Full workbook management command**
+   - imports the operational base data used by the calculator;
+   - supports historical Excel-vs-Django validation;
+   - includes products, suburbs, carrier configuration, zones, rates and workbook/bootstrap fuel.
+
+2. **Three Django Admin external sources**
+   - `product_sth.xlsx`: validated reference/staging rows only;
+   - `stock_sth.xlsx`: validated reference/staging rows only;
+   - `fuel.csv`: operational fuel only after explicit activation.
+
+Product and stock source uploads do not update the operational Product, FreightRate, FreightZone or carrier-configuration tables.
+
+## Current authentication boundary
+
+Login and multi-client user scope are web requirements, not Excel logic.
+
+Version 1 now implements:
+
+- Django built-in users and sessions;
+- `CalculatorUserProfile` with Customer/Internal roles;
+- single, selected and all-client scopes;
+- protected calculator page and APIs;
+- backend validation of the effective client;
+- one minimum `Django Administrator` group plus Technical Superusers;
+- explicit permissions for sensitive import actions.
+
+See:
+
+```text
+business_rules/users.md
+decisions/functional_decisions.md
+docs/05_authentication_integration.md
+docs/16_user_access_review_and_plan.md
+```
+
+## Current web-only calculation extension
+
+`Cubic Margin` accepts a whole percentage from 0 to 20. It adjusts visible/product cubic before rating while leaving pallet cubic separate. It has no confirmed Excel input and defaults to 0, preserving the normal Excel-parity path.
