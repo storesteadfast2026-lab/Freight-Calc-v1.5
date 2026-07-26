@@ -108,3 +108,38 @@ docker compose exec -it web python manage.py createsuperuser
 ## 7. Pending phase
 
 Email invitation/password setup is not yet implemented end to end. SMTP settings and token-delivery tests are required before enabling invitations.
+
+## 8. Login and access messages — 2026-07-24
+
+All front-end authentication feedback is rendered inside `registration/login.html`.
+
+Confirmed behavior:
+
+- invalid username/password uses one generic credential message;
+- valid credentials without calculator entitlement do not create a login session;
+- an old authenticated session without a calculator profile is cleared and redirected to login;
+- the browser never receives the internal text `This user does not have a calculator access profile.` as a plain page;
+- front-end CSRF failures use the same login-card visual presentation;
+- API authentication failures remain JSON (`401` or `403`);
+- Django Admin retains its independent CSRF response.
+
+The public access message is intentionally generic:
+
+```text
+Your account does not have access to the Freight Calculator.
+```
+
+Detailed entitlement reasons remain internal to the authorization service and are not exposed on the public login screen.
+
+## 9. Approved login visual baseline — 2026-07-24
+
+The supplied login HTML/CSS is the visual reference for the authentication screen.
+The approved sequence is:
+
+1. the complete login card moves from above to its centered position using `fadeInDown`;
+2. the Steadfast Freight logo fades in after 0.4 seconds;
+3. username, password and submit controls fade in at 0.6, 0.8 and 1.0 seconds;
+4. authentication, entitlement and CSRF messages remain inside the card;
+5. the Django POST form, `{% csrf_token %}`, `next` field and server-side validation remain unchanged.
+
+The dedicated stylesheet is `app/static/css/login.css`. It is intentionally separate from `app.css` so login-specific body, card and animation rules do not alter the freight calculator interface.

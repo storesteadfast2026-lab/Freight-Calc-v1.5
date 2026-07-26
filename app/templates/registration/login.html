@@ -1,33 +1,94 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sign in — Freight Calculator</title>
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/login.css' %}">
 </head>
-<body>
-<main class="page login-page">
-  <section class="card login-card">
-    <h1>Freight Calculator</h1>
-    <p class="muted">Sign in with your authorized user account.</p>
-    {% if form.errors %}
-      <div class="error">The email/username or password is incorrect.</div>
-    {% endif %}
-    {% if next and user.is_authenticated %}
-      <div class="error">Your account does not have access to that page.</div>
-    {% endif %}
+<body class="login-body">
+<main class="login-wrapper fadeInDown">
+  <section
+    id="formContent"
+    class="{% if form.errors %}shake{% endif %}"
+    aria-labelledby="login-heading"
+  >
+    <h1 id="login-heading" class="visually-hidden">Freight Calculator</h1>
+
+    <div class="fadeIn first login-brand">
+      <a href="https://steadfastfreight.com.au/" rel="noopener noreferrer">
+        <img
+          src="https://steadfast.net.au/wp-content/uploads/2026/03/steadfastfreight-web-logo.jpg"
+          class="logo-main"
+          alt="Steadfast Freight"
+        >
+      </a>
+    </div>
+
     <form method="post" action="{% url 'login' %}">
       {% csrf_token %}
-      <label>Email or username
-        <input type="text" name="username" autocomplete="username" autofocus required>
-      </label>
-      <label>Password
-        <input type="password" name="password" autocomplete="current-password" required>
-      </label>
+      <span class="auth-notice">AUTHORISED ENTRY ONLY</span>
+
+      {% if messages or form.errors or login_notice %}
+        <div id="loginFeedback" class="login-feedback" role="alert" aria-live="polite">
+          {% if login_notice %}
+            <div class="login-message login-message-error">{{ login_notice }}</div>
+          {% endif %}
+
+          {% for message in messages %}
+            <div class="login-message login-message-{{ message.tags|default:'info' }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+
+          {% if form.errors %}
+            <div class="login-message login-message-error">
+              The email/username or password is incorrect.
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <label class="visually-hidden" for="id_username">Email or username</label>
+      <input
+        type="text"
+        id="id_username"
+        name="username"
+        class="fadeIn second"
+        value="{{ form.username.value|default_if_none:'' }}"
+        placeholder="Email or username"
+        autocomplete="username"
+        autofocus
+        required
+      >
+
+      <label class="visually-hidden" for="id_password">Password</label>
+      <input
+        type="password"
+        id="id_password"
+        name="password"
+        class="fadeIn third"
+        placeholder="Password"
+        autocomplete="current-password"
+        required
+      >
+
       <input type="hidden" name="next" value="{{ next }}">
-      <button class="primary" type="submit">Sign in</button>
+      <input type="submit" class="fadeIn fourth" value="Sign in">
     </form>
+
+    <footer id="formFooter">
+      <div class="footer-caption">This service is brought to you by</div>
+      <a href="https://www.steadfast.net.au" rel="noopener noreferrer">
+        <img
+          src="https://steadfast.net.au/wp-content/uploads/2022/02/Updated-Steadfast-Logo-1536x480.png"
+          class="footer-logo"
+          alt="Steadfast Australia"
+        >
+      </a>
+    </footer>
   </section>
 </main>
 </body>

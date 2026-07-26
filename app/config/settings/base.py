@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -85,10 +85,11 @@ MEDIA_ROOT = Path(os.getenv('MEDIA_ROOT', str(BASE_DIR / 'uploaded_data')))
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/accounts/login/'
-
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
+
+CSRF_FAILURE_VIEW = 'apps.authentication_gateway.views.csrf_failure'
 CALCULATOR_REQUIRE_AUTH = os.getenv('CALCULATOR_REQUIRE_AUTH', '0') == '1'
 EXTERNAL_AUTH_HEADER = os.getenv('EXTERNAL_AUTH_HEADER', 'HTTP_X_AUTH_USER')
 
@@ -102,3 +103,5 @@ FREIGHT_PALLET_CUBIC_M3 = os.getenv('FREIGHT_PALLET_CUBIC_M3', '0.02')
 FUEL_SOURCE_URL = os.getenv('FUEL_SOURCE_URL', 'https://www.poscat.com.au/fuelsc/fuel.csv')
 FUEL_FETCH_TIMEOUT_SECONDS = int(os.getenv('FUEL_FETCH_TIMEOUT_SECONDS', '30'))
 FUEL_RATE_MAX = os.getenv('FUEL_RATE_MAX', '1.0')
+
+

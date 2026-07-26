@@ -57,3 +57,16 @@
 
 - **Status:** Partially implemented.
 - **Decision:** User creation and secure interactive password setup are implemented. Email invitation/password-reset delivery remains a later phase pending SMTP configuration and end-to-end testing.
+
+## DEC-012 — Calculator access errors use the login interface
+
+- **Status:** Accepted and implemented on 2026-07-24.
+- **Decision:** Valid credentials are checked for calculator entitlement before a login session is created. Front-end entitlement failures return to the login card with a generic message instead of exposing internal profile details in a plain 403 response.
+- **Security:** CSRF remains enabled; no `csrf_exempt` workaround is permitted.
+
+## DEC-013 — Supplied login design is the visual baseline
+
+- **Status:** Accepted and implemented on 2026-07-24.
+- **Decision:** Preserve the supplied login behavior: the complete card uses `fadeInDown`, and logo/fields use the original delayed fade sequence.
+- **Boundary:** Visual changes must not replace the Django POST form, CSRF token, server-side messages, entitlement validation or client authorization.
+- **Implementation:** Keep login-specific styling in `app/static/css/login.css` to avoid affecting the calculator UI.

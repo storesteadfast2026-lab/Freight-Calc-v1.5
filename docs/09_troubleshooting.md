@@ -321,3 +321,80 @@ Without `--set-password`, the command intentionally creates an unusable password
 ```powershell
 docker compose exec -it web python manage.py changepassword user@example.com
 ```
+
+## Login shows plain text: `This user does not have a calculator access profile`
+
+### Cause
+
+An existing Django account successfully authenticated but had no enabled `CalculatorUserProfile`. The original calculator decorator returned `HttpResponseForbidden`, which caused the browser to show the exception text on an otherwise blank page.
+
+### Resolution — 2026-07-24
+
+- `CalculatorLoginView` checks calculator entitlement before creating the session.
+- The calculator decorator clears old unauthorized sessions.
+- The user returns to the normal login card with a generic access message.
+- Internal profile details are no longer shown as a plain browser response.
+
+### Verification
+
+```powershell
+cd C:\Docker-Projects\Freight-Calc-Nuevo
+
+docker compose exec web python manage.py test `
+  apps.authentication_gateway.tests.test_login_flow `
+  apps.freight.tests.test_user_access `
+  -v 2
+```
+
+Expected manual result:
+
+```text
+Valid password + no calculator profile
+→ remain on login screen
+→ show: Your account does not have access to the Freight Calculator.
+→ no active authenticated session
+```
+
+## Logout displays Django CSRF debug page
+
+### Cause
+
+The logout form was submitted from a stale tab, a rotated session token, or a different host such as switching between `localhost` and a LAN IP.
+
+### Resolution — 2026-07-24
+
+The application keeps CSRF protection enabled but renders front-end CSRF failures with the login-card visual presentation. It does not add `csrf_exempt` and does not silently accept an invalid token.
+
+Use one host consistently during a browser session:
+
+```text
+http://localhost:8000
+```
+
+or:
+
+```text
+http://192.168.16.120:8000
+```
+
+## Login card fades in at the centre instead of moving down from above
+
+### Cause
+
+The approved source used `fadeInDown` on the complete wrapper and delayed `fadeIn` classes on the logo and fields. A generic replacement kept only opacity animation on elements already positioned in the centre.
+
+### Resolution — 2026-07-24
+
+- `registration/login.html` again uses `login-wrapper fadeInDown`.
+- `static/css/login.css` contains the isolated approved animation.
+- The visual change does not alter login, CSRF, messages, user profiles or client authorization.
+- The incorrect mobile rule `width: 400%` from the old standalone CSS was not copied; the corrected width is responsive.
+
+After deployment rebuild the web image and force-refresh the browser:
+
+```powershell
+cd C:\Docker-Projects\Freight-Calc-Nuevo
+docker compose up -d --build web
+```
+
+Then use `Ctrl + Shift + R` in the browser.

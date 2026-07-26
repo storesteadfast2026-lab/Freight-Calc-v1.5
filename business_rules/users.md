@@ -94,3 +94,8 @@ The command creates an unusable password unless `--set-password` is used interac
 ## USR-009 — Quotation permissions
 
 Quotation draft, finalization, PDF, email and ownership rules remain `PENDING` because no persistent Quotation model exists.
+
+## USR-010 - Generic login rejection
+
+All rejected calculator login attempts must return the same visible message, regardless of whether the username exists, the password is valid, the user is active or a calculator profile exists. Internal logs may record the specific reason. A rejected attempt must not create an authenticated session.
+

@@ -227,3 +227,25 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 - **Finding:** Codex proposal included quotation actions that have no current persistent model.
 - **Resolution:** Quotation permissions remain pending and were not implemented.
 - **Verification status:** New tests were authored. Full execution must be completed in Docker because the review environment did not contain Django or Docker.
+
+## 2026-07-24 — Calculator access error escaped the login interface
+
+- **Observed:** an authenticated Django user without `CalculatorUserProfile` received a blank page containing `This user does not have a calculator access profile.`
+- **Root cause:** `calculator_access_required` returned `HttpResponseForbidden` directly for non-API requests.
+- **Security concern:** the browser exposed an internal entitlement reason and left an authenticated-but-unauthorized session active.
+- **Resolution:** introduced entitlement-aware `CalculatorLoginView`; unauthorized sessions are cleared and all public feedback is rendered inside the login card with a generic message.
+- **CSRF behavior:** CSRF remains enabled. Front-end CSRF failures now use the login-card visual response; API failures remain JSON and Django Admin retains its own behavior.
+- **Calculation impact:** none.
+- **Migration required:** no.
+- **Verification:** run `apps.authentication_gateway.tests.test_login_flow` and `apps.freight.tests.test_user_access` in Docker.
+
+## 2026-07-24 — Login animation differed from the supplied visual reference
+
+- **Observed:** the current login content appeared with opacity fade while already centred.
+- **Expected:** the complete card moves from above to the centre and its logo/fields fade in sequentially.
+- **Root cause:** the implementation did not preserve the supplied `wrapper fadeInDown` hook and delayed `fadeIn` classes.
+- **Resolution:** introduced a dedicated `login.css` and restored the approved HTML animation hooks while preserving Django authentication, CSRF and login-card messages.
+- **Security impact:** none.
+- **Calculation impact:** none.
+- **Migration required:** no.
+- **Regression:** `test_login_template_preserves_approved_animation_hooks` verifies the stylesheet and class hooks.
