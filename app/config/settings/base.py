@@ -87,8 +87,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/accounts/login/"
-
+LOGOUT_REDIRECT_URL = "/admin/login/"
+
+
 CSRF_FAILURE_VIEW = 'apps.authentication_gateway.views.csrf_failure'
 CALCULATOR_REQUIRE_AUTH = os.getenv('CALCULATOR_REQUIRE_AUTH', '0') == '1'
 EXTERNAL_AUTH_HEADER = os.getenv('EXTERNAL_AUTH_HEADER', 'HTTP_X_AUTH_USER')

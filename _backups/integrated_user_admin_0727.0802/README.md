@@ -175,10 +175,3 @@ El valor predeterminado es 0 %, por lo que las baterías Excel vs Django existen
 Los campos de autocompletado de suburbios y productos leen desde PostgreSQL. En una base vacía, el contenedor intenta importar la planilla de muestra después de las migraciones si no existen suburbios cargados.
 
 Primero diagnostica con `showmigrations`, `migrate` y el comando de importación manual. No ejecutes `docker compose down -v` como solución inicial: elimina el volumen de PostgreSQL y todos sus datos. Úsalo solo para recrear deliberadamente un entorno descartable y después de confirmar que no necesitas conservar la base.
-
-
-<!-- USER_ADMIN_INTEGRATION_0727.0802 -->
-## Integrated user administration
-
-User identity and calculator access are managed from **Django Admin > Authentication and Authorization > Users**. See `docs/17_user_admin_runbook.md` and `docs/adr/0006_integrated_user_admin.md`.
-

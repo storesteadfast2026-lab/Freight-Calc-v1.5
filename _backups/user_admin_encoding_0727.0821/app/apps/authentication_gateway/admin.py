@@ -230,7 +230,7 @@ class STHUserAdmin(_DjangoUserAdmin):
     @admin.display(description='Calculator role', ordering='calculator_profile__role')
     def calculator_role(self, obj):
         profile = self._profile(obj)
-        return profile.get_role_display() if profile else '\u2014'
+        return profile.get_role_display() if profile else 'â€”'
 
     @admin.display(
         description='Client scope',
@@ -238,13 +238,13 @@ class STHUserAdmin(_DjangoUserAdmin):
     )
     def calculator_scope(self, obj):
         profile = self._profile(obj)
-        return profile.get_client_scope_display() if profile else '\u2014'
+        return profile.get_client_scope_display() if profile else 'â€”'
 
     @admin.display(description='Client access')
     def calculator_clients(self, obj):
         profile = self._profile(obj)
         if profile is None:
-            return '\u2014'
+            return 'â€”'
         if profile.role == CalculatorUserProfile.Role.CUSTOMER_USER:
             return profile.client.code if profile.client_id else 'Missing client'
         if profile.client_scope == CalculatorUserProfile.ClientScope.ALL_CLIENTS:

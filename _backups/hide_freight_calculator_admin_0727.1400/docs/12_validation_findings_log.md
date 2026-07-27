@@ -256,14 +256,3 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 
 Confirmed cause: creating a user in Django Admin created `auth.User` but not `CalculatorUserProfile`. The workflow now exposes the optional calculator profile in the same User screen. No calculation or schema change was made.
 
-
-## 2026-07-27 — FreightCalculator removed from Django Admin
-
-- **Scope:** Administrative visibility only.
-- **Reason:** The current calculation flow does not use the `FreightCalculator` Admin record to select formulas, rates, zones or an active engine.
-- **Change:** `Client` remains registered; `FreightCalculator` is no longer registered in Django Admin.
-- **Database impact:** None. The model, table, records and migrations remain unchanged.
-- **Calculation impact:** None expected; no freight calculation code was modified.
-- **Verification:** `apps.clients.tests.test_admin_visibility` confirms the expected Admin registration state.
-- **ADR:** `docs/adr/0007_hide_unused_freight_calculator_admin.md`.
-

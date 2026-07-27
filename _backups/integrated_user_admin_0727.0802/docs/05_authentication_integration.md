@@ -143,10 +143,3 @@ The approved sequence is:
 5. the Django POST form, `{% csrf_token %}`, `next` field and server-side validation remain unchanged.
 
 The dedicated stylesheet is `app/static/css/login.css`. It is intentionally separate from `app.css` so login-specific body, card and animation rules do not alter the freight calculator interface.
-
-
-<!-- USER_ADMIN_INTEGRATION_0727.0802 -->
-## Unified Django Admin workflow
-
-`auth.User` remains the identity source and `CalculatorUserProfile` remains the calculator-authorization source. Both are displayed in one User add/change screen. The profile is optional.
-

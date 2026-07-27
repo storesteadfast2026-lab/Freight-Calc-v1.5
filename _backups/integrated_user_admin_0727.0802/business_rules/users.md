@@ -99,10 +99,3 @@ Quotation draft, finalization, PDF, email and ownership rules remain `PENDING` b
 
 All rejected calculator login attempts must return the same visible message, regardless of whether the username exists, the password is valid, the user is active or a calculator profile exists. Internal logs may record the specific reason. A rejected attempt must not create an authenticated session.
 
-
-
-<!-- USER_ADMIN_INTEGRATION_0727.0802 -->
-## BR-USER-ADMIN-001 â€” One normal administration workflow
-
-The normal workflow is `Authentication and Authorization > Users`. Creating or enabling `auth.User` alone does not grant calculator access. A blank calculator block must not create access automatically.
-

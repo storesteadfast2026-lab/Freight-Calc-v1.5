@@ -46,10 +46,3 @@ Then manually verify:
 6. Product and Stock imports remain reference-only.
 7. Fuel validation, activation and rollback follow separate permissions.
 8. Existing Excel-vs-Django baseline remains unchanged.
-
-
-<!-- USER_ADMIN_INTEGRATION_0727.0802 -->
-## Implemented: integrated User administration
-
-User and CalculatorUserProfile remain separate database records but are managed in one Admin screen. Version 1 keeps user administration restricted to Technical Superusers.
-

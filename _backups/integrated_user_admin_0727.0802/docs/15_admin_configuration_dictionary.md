@@ -96,23 +96,3 @@ It grants view/add/change for current operational configuration models, view-onl
 ### Technical Superuser
 
 Created with Django `createsuperuser`. Use only for user/profile/group administration, recovery and exceptional technical operations.
-
-
-<!-- USER_ADMIN_INTEGRATION_0727.0802 -->
-## Authentication and Authorization > Users
-
-The list displays calculator status, role, client scope, client access and Django Admin level. The User form includes an optional Calculator access block. The standalone profile model is hidden from the menu.
-
-
-## FreightCalculator Admin visibility decision — 2026-07-27
-
-`clients.FreightCalculator` is intentionally not registered in Django Admin because its current fields do not control the active calculation flow. The model remains available internally for compatibility and possible future engine/version management.
-
-Operational administrators should use:
-
-```text
-Clients > Clients
-```
-
-There is no supported operational Admin screen for `FreightCalculator` in the current release.
-

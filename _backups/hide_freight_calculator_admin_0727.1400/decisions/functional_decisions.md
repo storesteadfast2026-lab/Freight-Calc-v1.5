@@ -77,11 +77,3 @@
 
 The existing one-to-one profile is administered as an optional inline in the User screen. The standalone profile administration is hidden from the normal menu but retained by direct URL for Technical Superuser diagnosis.
 
-
-## DEC-012 — Hide FreightCalculator from Django Admin
-
-- **Status:** Accepted and implemented.
-- **Decision:** Keep the `FreightCalculator` model and database table, but do not register it in Django Admin while it has no confirmed operational effect on calculations.
-- **Reason:** Avoid presenting an unused configuration as if it controlled the active engine.
-- **Reversibility:** The Admin registration can be restored later without recreating the model or its data.
-

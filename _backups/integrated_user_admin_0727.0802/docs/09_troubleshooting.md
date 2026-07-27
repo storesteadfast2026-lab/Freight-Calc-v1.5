@@ -398,10 +398,3 @@ docker compose up -d --build web
 ```
 
 Then use `Ctrl + Shift + R` in the browser.
-
-
-<!-- USER_ADMIN_INTEGRATION_0727.0802 -->
-## User authenticates but cannot open the calculator
-
-Open `Authentication and Authorization > Users` and inspect Calculator status. `Not configured` means no profile exists; `Disabled` means a profile exists with calculator access off.
-
