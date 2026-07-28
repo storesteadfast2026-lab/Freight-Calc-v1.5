@@ -213,11 +213,18 @@ Recovery command:
 docker compose exec web python manage.py reapply_active_fuel --client STH
 ```
 
-## 8. Permissions warning before adding staff users
+## 8. Import permissions
 
-The current Product/Stock upload path checks the model add permission. However, several custom Fuel validation/activation/rollback/download views and the read-only Audit/Source-row views rely too broadly on `is_staff`.
+The delivered source defines explicit permissions for sensitive import actions:
 
-Before granting Django Admin access to multiple users, add explicit permission checks for every custom Admin action and read-only model view. See `docs/16_user_access_review_and_plan.md`.
+```text
+imports.validate_external_data_file
+imports.activate_fuel
+imports.rollback_fuel
+imports.download_external_data_file
+```
+
+Standard model permissions continue to govern upload, change and read-only records. The package confirms that migration `imports.0004_external_data_file_permissions` is applied, but the complete targeted test run must still be captured before release approval.
 
 ## 9. Verification commands
 

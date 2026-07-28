@@ -12,7 +12,7 @@ Validación reproducible incluida en este paquete:
 live_latest: 20 casos, 77 resultados + 20 componentes = 97 OK / 0 FAIL
 ```
 
-La documentación histórica registra una ejecución anterior de `random_current` con 15 casos y 36 OK, pero el paquete revisado el 22 de julio de 2026 no contiene una batería random completa: solo incluye 5 casos y faltan outputs, componentes, baseline y reporte. Por lo tanto, ese resultado histórico no debe presentarse como reproducible desde este ZIP.
+La documentación histórica registra una ejecución anterior de `random_current` con 15 casos y 36 OK, pero el paquete generado el 28 de julio de 2026 no contiene una batería random completa: solo incluye 5 casos y faltan outputs, componentes, baseline y reporte. Por lo tanto, ese resultado histórico no debe presentarse como reproducible desde este ZIP.
 
 Último hito documentado:
 
@@ -86,11 +86,53 @@ Documentos principales:
 - `docs/13_ai_spec_driven_workflow.md`: forma de trabajar con IA y spec-driven development.
 - `docs/14_excel_django_traceability_matrix.md`: matriz Excel ↔ Django.
 - `docs/15_admin_configuration_dictionary.md`: diccionario de Django Admin.
-- `docs/16_user_access_review_and_plan.md`: revisión técnica y plan de usuarios/accesos.
+- `docs/16_user_access_review_and_plan.md`: registro de implementación y pendientes de usuarios/accesos.
+- `docs/17_user_admin_runbook.md`: operación de usuarios desde Django Admin.
+- `docs/18_login_security_and_ui.md`: seguridad y diseño del login.
+- `docs/19_documentation_status.md`: mapa canónico, evidencia incluida y pendientes reales.
+- `docs/20_ai_project_continuation_prompt.md`: prompt maestro actualizado para retomar el proyecto con IA.
 - `business_rules/`: reglas funcionales aprobadas o propuestas.
 - `decisions/`: registro de decisiones funcionales.
 - `docs/adr/`: decisiones técnicas permanentes.
 
+
+## Prompt para continuar el proyecto con IA
+
+Para iniciar una conversación nueva sin depender del historial del chat, usar el prompt canónico:
+
+```text
+docs/20_ai_project_continuation_prompt.md
+```
+
+El prompt obliga a revisar primero la evidencia del repositorio, distingue estados de implementación y validación, conserva las rutas fijas de las baterías y evita convertir pendientes en reglas confirmadas.
+
+## Alcance del paquete de revisión
+
+Este ZIP es un snapshot para revisión y no reemplaza el repositorio completo. La copia controlada del Excel está en:
+
+```text
+reference_files/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
+```
+
+Los comandos operativos continúan usando la ruta del proyecto completo:
+
+```text
+sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
+```
+
+En el paquete faltan archivos necesarios para construir o reproducir todo desde cero, incluyendo `docker/django/Dockerfile`, el baseline emparejado de `live_latest` y el conjunto completo de `random_current`. Por eso, `manage.py check` y las migraciones capturadas son evidencia válida, pero la suite completa y la batería random deben ejecutarse en `C:\Docker-Projects\Freight-Calc-Nuevo`.
+
+## Autoridad documental
+
+Las fuentes normativas son:
+
+```text
+business_rules/*.md
+decisions/functional_decisions.md
+docs/adr/*.md
+```
+
+Las rutas antiguas bajo `docs/business rules/` y `docs/decisions/` son punteros de compatibilidad y no contienen reglas independientes.
 
 ## Fuentes externas administradas por Django
 
@@ -181,4 +223,3 @@ Primero diagnostica con `showmigrations`, `migrate` y el comando de importación
 ## Integrated user administration
 
 User identity and calculator access are managed from **Django Admin > Authentication and Authorization > Users**. See `docs/17_user_admin_runbook.md` and `docs/adr/0006_integrated_user_admin.md`.
-

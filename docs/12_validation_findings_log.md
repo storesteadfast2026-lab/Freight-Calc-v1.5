@@ -252,7 +252,7 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 
 
 <!-- USER_ADMIN_INTEGRATION_0727.0802 -->
-## 2026-07-27 â€” UserAdmin integration
+## 2026-07-27 — UserAdmin integration
 
 Confirmed cause: creating a user in Django Admin created `auth.User` but not `CalculatorUserProfile`. The workflow now exposes the optional calculator profile in the same User screen. No calculation or schema change was made.
 
@@ -267,3 +267,15 @@ Confirmed cause: creating a user in Django Admin created `auth.User` but not `Ca
 - **Verification:** `apps.clients.tests.test_admin_visibility` confirms the expected Admin registration state.
 - **ADR:** `docs/adr/0007_hide_unused_freight_calculator_admin.md`.
 
+
+## 2026-07-28 — Documentation canonicalization and completion
+
+- **Finding:** duplicate user rules, duplicate decision logs, placeholder Product/Rate/Quotation files and numbering collisions allowed contradictory interpretations.
+- **Resolution:** established canonical `business_rules/`, `decisions/functional_decisions.md` and uniquely numbered ADR/doc paths; historical duplicates now point to canonical files.
+- **Finding:** the authentication traceability matrix still described Version 1 as proposed/not implemented.
+- **Resolution:** updated it to `IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK`, consistent with the delivered source and incomplete packaged test capture.
+- **Finding:** documentation used the historical `C:\Docker-Projects\Freight-Calc-Nuevo` path.
+- **Resolution:** all operational commands now use `C:\Docker-Projects\Freight-Calc-Nuevo`.
+- **Finding:** Product, Rate and Quotation business-rule files were placeholders.
+- **Resolution:** Product and Rate files now contain only confirmed behavior plus explicit Excel-dependent pending items; Quotation remains an explicit pending specification because no model exists.
+- **Calculation impact:** none. No Python, migration, template, CSS, CSV, report or workbook content was changed.

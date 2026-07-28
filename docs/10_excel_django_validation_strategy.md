@@ -70,7 +70,7 @@ OK rows: 36
 FAIL rows: 0
 ```
 
-This historical result is not reproducible from the 2026-07-22 review package. The package contains only `sth_excel_random_cases.csv` with 5 cases under `random_current`; the matching outputs, components, Excel baseline and report are absent. Regenerate all four artifacts together before calling the current random battery passing.
+This historical result is not reproducible from the 2026-07-28 review package. The package contains only `sth_excel_random_cases.csv` with 5 cases under `random_current`; the matching outputs, components, Excel baseline and report are absent. Regenerate all four artifacts together before calling the current random battery passing.
 
 The only supported random workspace is `random_current`. Do not create or use `random_5`, `random_10`, `random_30` or similar folders for future runs; legacy folders in the repository should be treated as deprecated evidence.
 

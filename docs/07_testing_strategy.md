@@ -42,7 +42,7 @@ Current battery types:
 | `live_latest` | Stable real 20-case regression battery | `app/apps/freight/fixtures/live_latest/` | `reports/sth_excel_live_comparison_report.csv` |
 | `random_current` | Replaceable random exploratory battery | `app/apps/freight/fixtures/random_current/` | `reports/random_current/sth_excel_random_comparison_report.csv` |
 
-Current evidence in the 2026-07-22 review package:
+Current evidence in the 2026-07-28 review package:
 
 ```text
 live_latest

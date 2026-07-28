@@ -124,14 +124,15 @@ Esta versión fue contrastada con el código actualizado y con `V2026.R2_Unlocke
 | `IMP-STOCK-001` | `stock_sth.xlsx` | Upload stock source / Validate / View rows | `StockSourceRow` | Reference-only; repeated Stock SKUs preserved; no operational update or activation | CONFIRMADO |
 | `IMP-ISOLATION-001` | Product/Stock external files | Validation summary | Source rows only | `operational_tables_updated=False`; Product/Rate/Zone/Config unchanged | CONFIRMADO by code/tests; rerun runtime tests in current environment |
 
-## 2026-07-22 user/access traceability
+## 2026-07-28 user/access traceability
 
-| trace_id | Requirement/source | Current code | Proposed target | Status/risk |
+| trace_id | Requirement/source | Delivered source | Runtime evidence in package | Status/risk |
 |---|---|---|---|---|
-| `AUTH-ROLE-001` | Customer User and Internal User only | No calculator profile | Profile role with two choices | CONFIRMED requirement; not implemented |
-| `AUTH-ADMIN-001` | Django Admin separate from calculator role | `is_staff`/superuser only | One Django Administrator group + technical superuser | PROPOSED |
-| `AUTH-LOGIN-001` | Login by email | No calculator login | Built-in User; normalized email stored in username/email | PROPOSED |
-| `AUTH-CLIENT-001` | User client scope | Freight views default/accept STH client values | Central backend authorized-client resolver | RIESGO_REVISAR |
-| `AUTH-MW-001` | ExternalAuthMiddleware | Header presence can pass API gate but does not authenticate User | Django session login; external header only under trusted proxy and explicit mapping | RIESGO_REVISAR |
-| `AUTH-ADMIN-PERM-001` | Least-privilege Admin | several custom actions/views rely broadly on staff | explicit model/action permissions | RIESGO_REVISAR |
-| `AUTH-QUOTE-001` | Quotation visibility/actions in Codex draft | No Quotation model | separate future specification | PENDING |
+| `AUTH-ROLE-001` | Customer User and Internal User only | `CalculatorUserProfile` with two role choices | migrations applied; complete suite did not finish | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
+| `AUTH-ADMIN-001` | Django Admin separate from calculator role | Django Administrator group plus Technical Superuser boundary | migrations and `manage.py check` passed; targeted tests not captured as complete | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
+| `AUTH-LOGIN-001` | Login by normalized email | built-in User with normalized email in username/email for calculator accounts | source and templates present; complete suite did not finish | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
+| `AUTH-CLIENT-001` | User client scope | centralized authorized-client resolver and protected calculator APIs | tests present; execution must be rerun | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
+| `AUTH-MW-001` | Admin authorization boundary | `DjangoAdminAccessMiddleware` plus profile/group requirements | middleware source present; execution must be rerun | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
+| `AUTH-ADMIN-PERM-001` | Least-privilege Admin | explicit validate/activate/rollback/download permissions | migration `imports.0004` applied; targeted tests not captured as complete | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
+| `AUTH-USER-ADMIN-001` | One user-management workflow | optional CalculatorUserProfile inline in UserAdmin; standalone menu hidden | source present; no schema migration required | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
+| `AUTH-QUOTE-001` | Quotation behavior | no Quotation model and no approved quotation rules | not applicable | PENDING_SPECIFICATION |

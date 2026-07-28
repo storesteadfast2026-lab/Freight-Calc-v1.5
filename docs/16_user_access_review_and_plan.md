@@ -1,7 +1,7 @@
 # User Access Version 1 — Implementation Record
 
 **Implemented:** 2026-07-22  
-**Release state:** Code complete; Docker migration and full test execution required.
+**Release state:** Implemented in source; migrations are captured as applied and `manage.py check` passed. Full/targeted test execution remains required because the packaged suite stopped while creating the test database.
 
 ## Implemented
 
@@ -21,8 +21,8 @@
 
 ## Not implemented
 
-- Email invitations and password-reset email delivery.
-- Restricted user-management UI for normal administrators.
+- Email invitations and password-reset email delivery (pending SMTP configuration and end-to-end tests).
+- User management by normal Django Administrators; Version 1 keeps it Technical-Superuser-only by decision.
 - Object-level selected-client scoping inside Django Admin.
 - Quotation persistence and quotation permissions.
 
@@ -52,4 +52,3 @@ Then manually verify:
 ## Implemented: integrated User administration
 
 User and CalculatorUserProfile remain separate database records but are managed in one Admin screen. Version 1 keeps user administration restricted to Technical Superusers.
-

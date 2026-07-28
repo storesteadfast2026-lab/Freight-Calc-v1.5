@@ -1,7 +1,8 @@
 # Functional Decisions Log
 
 **Project:** STH Freight Calculator  
-**Last review:** 2026-07-22
+**Last review:** 2026-07-28  
+**Canonical location:** `decisions/functional_decisions.md`
 
 ## DEC-001 — Calculator roles
 
@@ -15,7 +16,7 @@
 
 ## DEC-003 — Minimum Django Admin profiles
 
-- **Status:** Accepted and implemented.
+- **Status:** Accepted and implemented in source.
 - **Decision:** Use one `Django Administrator` group plus exceptional native Technical Superusers.
 
 ## DEC-004 — Existing Django user model
@@ -31,57 +32,57 @@
 ## DEC-006 — Quotation permissions
 
 - **Status:** Pending.
-- **Reason:** There is no persistent Quotation model.
+- **Decision:** No quotation permission or lifecycle rule is approved until a persistent Quotation model and separate specification exist.
 
 ## DEC-007 — Three Django Admin source files
 
-- **Status:** Confirmed.
+- **Status:** Accepted and implemented in source.
 - **Decision:** Product and Stock remain reference-only staging. Fuel changes operational values only after explicit activation.
 
 ## DEC-008 — Review-package contents
 
 - **Status:** Accepted.
-- **Decision:** Review packages include `business_rules/`, `decisions/`, `docs/`, code, tests and controlled reference files.
+- **Decision:** Review packages include `business_rules/`, `decisions/`, `docs/`, code, tests, controlled reference files and captured diagnostics. A review package may still be non-runnable when required runtime-only files are omitted; that limitation must be stated explicitly.
 
 ## DEC-009 — Administrator scope and privilege escalation
 
-- **Status:** Accepted and implemented.
-- **Decision:** Normal Django Administrators must be Internal User / All clients. User/group/permission and superuser management remain Technical-Superuser-only.
+- **Status:** Accepted and implemented in source.
+- **Decision:** Normal Django Administrators must be Internal User / All clients. User, Group, Permission and superuser management remain Technical-Superuser-only.
 
 ## DEC-010 — Import action permissions
 
-- **Status:** Accepted and implemented.
+- **Status:** Accepted and implemented in source.
 - **Decision:** Validation, Fuel activation, Fuel rollback and external-file download use distinct custom Django permissions instead of relying only on `is_staff`.
 
 ## DEC-011 — Initial password workflow
 
 - **Status:** Partially implemented.
-- **Decision:** User creation and secure interactive password setup are implemented. Email invitation/password-reset delivery remains a later phase pending SMTP configuration and end-to-end testing.
+- **Decision:** User creation and secure interactive password setup are implemented. Email invitation and password-reset delivery remain pending SMTP configuration and end-to-end tests.
 
 ## DEC-012 — Calculator access errors use the login interface
 
-- **Status:** Accepted and implemented on 2026-07-24.
-- **Decision:** Valid credentials are checked for calculator entitlement before a login session is created. Front-end entitlement failures return to the login card with a generic message instead of exposing internal profile details in a plain 403 response.
+- **Status:** Accepted and implemented in source on 2026-07-24.
+- **Decision:** Calculator entitlement is checked before retaining a login session. Public entitlement failures return to the login card with a generic message instead of exposing internal profile details.
 - **Security:** CSRF remains enabled; no `csrf_exempt` workaround is permitted.
 
 ## DEC-013 — Supplied login design is the visual baseline
 
-- **Status:** Accepted and implemented on 2026-07-24.
+- **Status:** Accepted and implemented in source on 2026-07-24.
 - **Decision:** Preserve the supplied login behavior: the complete card uses `fadeInDown`, and logo/fields use the original delayed fade sequence.
 - **Boundary:** Visual changes must not replace the Django POST form, CSRF token, server-side messages, entitlement validation or client authorization.
-- **Implementation:** Keep login-specific styling in `app/static/css/login.css` to avoid affecting the calculator UI.
 
+## DEC-014 — Integrated user administration
 
-<!-- USER_ADMIN_INTEGRATION_0727.0802 -->
-## Accepted â€” integrate CalculatorUserProfile into UserAdmin
+- **Status:** Accepted and implemented in source on 2026-07-27.
+- **Decision:** Manage identity and optional `CalculatorUserProfile` in `Authentication and Authorization > Users`. Hide the standalone profile from the normal Admin index while retaining direct Technical-Superuser diagnostic access.
 
-The existing one-to-one profile is administered as an optional inline in the User screen. The standalone profile administration is hidden from the normal menu but retained by direct URL for Technical Superuser diagnosis.
+## DEC-015 — Hide FreightCalculator from Django Admin
 
-
-## DEC-012 — Hide FreightCalculator from Django Admin
-
-- **Status:** Accepted and implemented.
+- **Status:** Accepted and implemented in source on 2026-07-27.
 - **Decision:** Keep the `FreightCalculator` model and database table, but do not register it in Django Admin while it has no confirmed operational effect on calculations.
-- **Reason:** Avoid presenting an unused configuration as if it controlled the active engine.
-- **Reversibility:** The Admin registration can be restored later without recreating the model or its data.
+- **Reversibility:** Admin registration can be restored if the model later becomes operationally meaningful.
 
+## DEC-016 — Documentation canonicalization
+
+- **Status:** Accepted on 2026-07-28.
+- **Decision:** `business_rules/`, `decisions/functional_decisions.md`, numbered `docs/` files and uniquely numbered ADRs are canonical. Duplicate historical paths remain only as explicit pointers and must not contain competing rules.

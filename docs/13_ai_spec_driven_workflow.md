@@ -69,8 +69,8 @@ Docs updated:
 
 After meaningful changes, update the relevant files among:
 
-- `business_rules/`;
-- `decisions/`;
+- `business_rules/` (canonical business rules);
+- `decisions/functional_decisions.md` (canonical functional decisions);
 - `docs/02_calculation_flow.md`;
 - `docs/04_imports.md`;
 - `docs/05_authentication_integration.md`;
@@ -80,6 +80,7 @@ After meaningful changes, update the relevant files among:
 - `docs/12_validation_findings_log.md`;
 - `docs/14_excel_django_traceability_matrix.md`;
 - `docs/15_admin_configuration_dictionary.md`;
+- `docs/20_ai_project_continuation_prompt.md` when a durable workflow, path, source hierarchy or structural project status changes;
 - `docs/adr/`.
 
 ## Review ZIP rule
@@ -98,6 +99,41 @@ controlled reference files
 runtime diagnostics
 ```
 
+## Reusable continuation prompt
+
+The canonical prompt for starting a new AI-assisted project session is:
+
+```text
+docs/20_ai_project_continuation_prompt.md
+```
+
+It contains the current project path, source hierarchy, fixed battery locations, known package limitations, required response format and the distinction between snapshot evidence and permanent rules. Update that prompt only after updating the canonical documentation and retained evidence.
+
 ## Do not rely on chat memory only
 
 Important project decisions must be stored in the repository so a future review can continue from the files without reconstructing prior conversations.
+
+## Canonical documentation locations
+
+Use only these files as normative sources:
+
+```text
+business_rules/*.md
+decisions/functional_decisions.md
+docs/adr/*.md
+```
+
+Files under `docs/business rules/` and `docs/decisions/` are compatibility pointers only. A placeholder or older duplicate must never override a canonical file.
+
+## Runtime-evidence wording
+
+Use these distinctions consistently:
+
+```text
+Implemented in source     = code is present.
+Runtime verified          = the named command completed successfully and evidence is retained.
+Reproducible from package = all required fixtures, baseline and report are included.
+Pending                   = required evidence or specification does not exist yet.
+```
+
+Do not describe code as release-verified when the captured test suite did not complete.

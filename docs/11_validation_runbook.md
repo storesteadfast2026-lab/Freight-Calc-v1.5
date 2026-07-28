@@ -5,7 +5,7 @@
 From PowerShell:
 
 ```powershell
-cd C:\Docker-Projects\Freight-Calc-05jun
+cd C:\Docker-Projects\Freight-Calc-Nuevo
 .\.venv-excel\Scripts\activate
 ```
 
@@ -78,7 +78,7 @@ FAIL rows: 0
 
 ### random_current
 
-A previous documented run recorded 15 cases and 36 OK rows. The 2026-07-22 review package does not contain the complete matching evidence set, so the current random status must be treated as not confirmed until regenerated. The package currently has 5 input cases only.
+A previous documented run recorded 15 cases and 36 OK rows. The 2026-07-28 review package does not contain the complete matching evidence set, so the current random status must be treated as not confirmed until regenerated. The package currently has 5 input cases only.
 
 ## Regenerate random_current using fixed paths and names
 
@@ -208,7 +208,7 @@ docker compose exec web python manage.py shell -c "from apps.imports.models impo
 
 ### Current review-package limitation
 
-The 2026-07-22 review package reported `manage.py check` and migrations successfully, but its complete test-suite capture stopped while creating the test database and its database-summary command was malformed. Re-run the commands above in the project environment before treating the runtime state as fully verified.
+The 2026-07-28 review package reported `manage.py check` and migrations successfully, but its complete test-suite capture stopped while creating the test database and its database-summary command was malformed. Re-run the commands above in the project environment before treating the runtime state as fully verified.
 
 ## User-access implementation validation order
 
@@ -220,17 +220,17 @@ When user code is authorized, validate in this order:
 3. customer client-isolation tests
 4. internal selected/all-client tests
 5. Admin custom-action permission tests
-6. invitation/password setup tests
+6. interactive password setup tests; email invitation/reset delivery remains pending
 7. existing freight and import regression tests
 8. Excel-vs-Django batteries to prove calculation behavior is unchanged
 ```
 
 ## User access deployment and validation — 2026-07-22
 
-Apply migrations and create the minimum administrator group:
+Apply migrations and createte the minimum administrator group:
 
 ```powershell
-cd C:\Docker-Projects\Freight-Calc-05jun
+cd C:\Docker-Projects\Freight-Calc-Nuevo
 
 docker compose up -d --build
 docker compose exec web python manage.py migrate

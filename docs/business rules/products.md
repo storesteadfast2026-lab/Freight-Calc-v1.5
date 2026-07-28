@@ -1,5 +1,7 @@
-# Business Rules - Products
+# Deprecated documentation location
 
-Placeholder.
+The canonical Product rules are in:
 
-This document will define SKU behaviour, dimensions, oversize, overlength and operational restrictions.
+```text
+business_rules/products.md
+```

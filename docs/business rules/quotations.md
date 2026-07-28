@@ -1,5 +1,9 @@
-# Business Rules - Quotations
+# Deprecated documentation location
 
-Placeholder.
+The canonical Quotation scope record is in:
 
-This document will define quotation lifecycle, statuses, permissions and validation rules.
+```text
+business_rules/quotations.md
+```
+
+Quotation behavior remains `PENDING`; no persistent Quotation model exists in the delivered project.

@@ -1,5 +1,7 @@
-# Business Rules - Rates
+# Deprecated documentation location
 
-Placeholder.
+The canonical Rate and Zone rules are in:
 
-This document will define carrier rates, fuel surcharge, import rules and effective dates.
+```text
+business_rules/rates.md
+```

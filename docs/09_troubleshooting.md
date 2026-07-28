@@ -108,7 +108,7 @@ random_current 15 cases: 36 OK / 0 FAIL
 live_latest 20 cases: 97 OK / 0 FAIL
 ```
 
-In the 2026-07-22 review package, only the `live_latest` result remains directly reproducible. The current `random_current` evidence set is incomplete; see `docs/12_validation_findings_log.md`.
+In the 2026-07-28 review package, only the `live_latest` result remains directly reproducible. The current `random_current` evidence set is incomplete; see `docs/12_validation_findings_log.md`.
 
 ## Fetch fuel from source fails
 
@@ -404,4 +404,3 @@ Then use `Ctrl + Shift + R` in the browser.
 ## User authenticates but cannot open the calculator
 
 Open `Authentication and Authorization > Users` and inspect Calculator status. `Not configured` means no profile exists; `Disabled` means a profile exists with calculator access off.
-
