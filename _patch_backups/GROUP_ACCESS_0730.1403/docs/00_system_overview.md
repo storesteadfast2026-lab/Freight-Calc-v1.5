@@ -47,7 +47,7 @@ Version 1 now implements:
 - single, selected and all-client scopes;
 - protected calculator page and APIs;
 - backend validation of the effective client;
-- protected `Administrators`, `Customers` and `Steadfast Users` groups plus the native Super User `super`;
+- one minimum `Django Administrator` group plus Technical Superusers;
 - explicit permissions for sensitive import actions.
 
 See:

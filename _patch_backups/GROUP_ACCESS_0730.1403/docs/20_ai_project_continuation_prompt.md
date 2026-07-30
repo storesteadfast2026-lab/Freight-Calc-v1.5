@@ -159,12 +159,10 @@ Roles de calculadora:
 - Internal User: todos los clientes o clientes seleccionados.
 
 Administración:
-- Administrator: grupo `Administrators`, Internal User / ALL_CLIENTS y acceso operacional a Django Admin.
-- Super User: cuenta nativa `super` para usuarios, grupos, configuración y recuperación.
+- Django Administrator: Internal User / ALL_CLIENTS / grupo autorizado.
+- Technical Superuser: superusuario nativo para configuración y recuperación.
 - User y CalculatorUserProfile se administran en una sola pantalla de Django Admin.
-- El perfil de calculadora puede estar ausente para el Super User.
-- Los usuarios normales usan exactamente un grupo principal: `Administrators`, `Customers` o `Steadfast Users`.
-- Los permisos individuales no se administran en Users; se administran en Groups.
+- El perfil de calculadora puede estar ausente para un Technical Superuser.
 
 No describas invitaciones por correo o password reset por email como finalizados: requieren SMTP y pruebas end-to-end.
 
@@ -200,7 +198,7 @@ PROCEDIMIENTO PARA CAMBIOS WEB, USUARIOS O ADMIN
 3. Evalúa seguridad, autorización backend y migraciones.
 4. No confíes solo en ocultar elementos de interfaz.
 5. Agrega o actualiza pruebas de autorización antes de considerar terminado el cambio.
-6. Mantén separados Super User, Administrators y acceso a la calculadora.
+6. Mantén separados Technical Superuser, Django Administrator y acceso a la calculadora.
 
 FORMATO OBLIGATORIO AL PROPONER O EJECUTAR UN CAMBIO
 

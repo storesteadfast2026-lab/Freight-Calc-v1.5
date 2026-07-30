@@ -6,11 +6,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from apps.authentication_gateway.models import CalculatorUserProfile
-from apps.authentication_gateway.services import (
-    ADMINISTRATORS_GROUP,
-    CUSTOMERS_GROUP,
-    STEADFAST_USERS_GROUP,
-)
+from apps.authentication_gateway.services import DJANGO_ADMINISTRATOR_GROUP
 from apps.clients.models import Client
 
 
@@ -18,27 +14,20 @@ class AccessManagementCommandTests(TestCase):
     def setUp(self):
         self.client_sth = Client.objects.create(code='STH', name='STH')
 
-    def test_setup_access_roles_creates_protected_groups_without_user_management(self):
+    def test_setup_access_roles_creates_minimum_group_without_user_management(self):
         output = StringIO()
         call_command('setup_access_roles', stdout=output)
 
-        group = Group.objects.get(name=ADMINISTRATORS_GROUP)
+        group = Group.objects.get(name=DJANGO_ADMINISTRATOR_GROUP)
         codenames = set(group.permissions.values_list('codename', flat=True))
         self.assertIn('view_client', codenames)
         self.assertIn('activate_fuel', codenames)
         self.assertIn('view_auditevent', codenames)
         self.assertNotIn('add_user', codenames)
         self.assertNotIn('change_group', codenames)
-        self.assertFalse(
-            Group.objects.get(name=CUSTOMERS_GROUP).permissions.exists()
-        )
-        self.assertFalse(
-            Group.objects.get(name=STEADFAST_USERS_GROUP).permissions.exists()
-        )
 
     def test_create_customer_user(self):
         output = StringIO()
-        call_command('setup_access_roles', stdout=StringIO())
         call_command(
             'create_calculator_user',
             email='CUSTOMER@EXAMPLE.COM',
@@ -55,7 +44,6 @@ class AccessManagementCommandTests(TestCase):
             CalculatorUserProfile.Role.CUSTOMER_USER,
         )
         self.assertEqual(user.calculator_profile.client, self.client_sth)
-        self.assertTrue(user.groups.filter(name=CUSTOMERS_GROUP).exists())
 
     def test_create_minimum_django_administrator(self):
         call_command('setup_access_roles', stdout=StringIO())
@@ -71,24 +59,8 @@ class AccessManagementCommandTests(TestCase):
         user = get_user_model().objects.get(username='admin@example.com')
         self.assertTrue(user.is_staff)
         self.assertFalse(user.is_superuser)
-        self.assertTrue(user.groups.filter(name=ADMINISTRATORS_GROUP).exists())
+        self.assertTrue(user.groups.filter(name=DJANGO_ADMINISTRATOR_GROUP).exists())
         self.assertEqual(
             user.calculator_profile.client_scope,
             CalculatorUserProfile.ClientScope.ALL_CLIENTS,
-        )
-
-    def test_create_internal_user_uses_steadfast_users_group(self):
-        call_command('setup_access_roles', stdout=StringIO())
-        call_command(
-            'create_calculator_user',
-            email='steadfast@example.com',
-            role='internal',
-            all_clients=True,
-            stdout=StringIO(),
-        )
-
-        user = get_user_model().objects.get(username='steadfast@example.com')
-        self.assertFalse(user.is_staff)
-        self.assertTrue(
-            user.groups.filter(name=STEADFAST_USERS_GROUP).exists()
         )

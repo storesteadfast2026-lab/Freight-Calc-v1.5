@@ -33,6 +33,6 @@ class DjangoAdminAccessMiddleware:
                 if not is_django_administrator(user):
                     return HttpResponseForbidden(
                         'Django Admin access requires Internal User / All clients '
-                        'and membership in the Administrators group.'
+                        'and membership in the Django Administrator group.'
                     )
         return self.get_response(request)

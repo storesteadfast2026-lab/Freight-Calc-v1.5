@@ -1,8 +1,14 @@
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from apps.authentication_gateway.services import DJANGO_ADMINISTRATOR_GROUP
+from apps.authentication_gateway.services import (
+    ADMINISTRATORS_GROUP,
+    CUSTOMERS_GROUP,
+    LEGACY_DJANGO_ADMINISTRATOR_GROUP,
+    STEADFAST_USERS_GROUP,
+)
 
 
 STANDARD_PERMISSION_TARGETS = {
@@ -46,11 +52,34 @@ STANDARD_PERMISSION_TARGETS = {
 
 
 class Command(BaseCommand):
-    help = 'Create or update the minimum Django Administrator group and permissions.'
+    help = 'Create or update the protected group-based access model.'
 
     @transaction.atomic
     def handle(self, *args, **options):
-        group, created = Group.objects.get_or_create(name=DJANGO_ADMINISTRATOR_GROUP)
+        legacy_group = Group.objects.filter(
+            name=LEGACY_DJANGO_ADMINISTRATOR_GROUP
+        ).first()
+        administrators = Group.objects.filter(name=ADMINISTRATORS_GROUP).first()
+        renamed_legacy = False
+
+        if legacy_group is not None and administrators is None:
+            legacy_group.name = ADMINISTRATORS_GROUP
+            legacy_group.save(update_fields=['name'])
+            administrators = legacy_group
+            renamed_legacy = True
+        elif administrators is None:
+            administrators = Group.objects.create(name=ADMINISTRATORS_GROUP)
+        elif legacy_group is not None:
+            for user in legacy_group.user_set.all():
+                user.groups.add(administrators)
+
+        customers, customers_created = Group.objects.get_or_create(
+            name=CUSTOMERS_GROUP
+        )
+        steadfast_users, steadfast_created = Group.objects.get_or_create(
+            name=STEADFAST_USERS_GROUP
+        )
+
         permissions = []
         missing = []
 
@@ -78,13 +107,48 @@ class Command(BaseCommand):
                 + ', '.join(sorted(missing))
             )
 
-        group.permissions.set(permissions)
-        action = 'Created' if created else 'Updated'
+        administrators.permissions.set(permissions)
+        customers.permissions.clear()
+        steadfast_users.permissions.clear()
+
+        if renamed_legacy:
+            action = 'Renamed legacy group to'
+        else:
+            action = 'Created or updated'
         self.stdout.write(self.style.SUCCESS(
-            f'{action} group "{DJANGO_ADMINISTRATOR_GROUP}" with '
+            f'{action} group "{ADMINISTRATORS_GROUP}" with '
             f'{len(permissions)} permissions.'
         ))
         self.stdout.write(
-            'User/group administration and superuser assignment remain '
-            'Technical-Superuser-only.'
+            f'{"Created" if customers_created else "Updated"} group '
+            f'"{CUSTOMERS_GROUP}" with 0 Django Admin permissions.'
+        )
+        self.stdout.write(
+            f'{"Created" if steadfast_created else "Updated"} group '
+            f'"{STEADFAST_USERS_GROUP}" with 0 Django Admin permissions.'
+        )
+
+        if legacy_group is not None and not renamed_legacy:
+            self.stdout.write(self.style.WARNING(
+                f'Legacy group "{LEGACY_DJANGO_ADMINISTRATOR_GROUP}" still exists '
+                f'because "{ADMINISTRATORS_GROUP}" already existed. Review and '
+                'transfer its users manually before deleting it.'
+            ))
+
+        direct_permission_users = list(
+            get_user_model().objects
+            .filter(is_superuser=False, user_permissions__isnull=False)
+            .distinct()
+            .values_list('username', flat=True)
+        )
+        if direct_permission_users:
+            self.stdout.write(self.style.WARNING(
+                'Individual permissions still exist for: '
+                + ', '.join(direct_permission_users)
+                + '. Review them before clearing; this command did not remove them.'
+            ))
+
+        self.stdout.write(
+            'User/group administration and Super User assignment remain '
+            'Super-User-only.'
         )

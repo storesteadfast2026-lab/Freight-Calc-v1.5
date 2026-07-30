@@ -8,16 +8,12 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from apps.authentication_gateway.models import CalculatorUserProfile
-from apps.authentication_gateway.services import (
-    ADMINISTRATORS_GROUP,
-    CUSTOMERS_GROUP,
-    STEADFAST_USERS_GROUP,
-)
+from apps.authentication_gateway.services import DJANGO_ADMINISTRATOR_GROUP
 from apps.clients.models import Client
 
 
 class Command(BaseCommand):
-    help = 'Create a Customer, Steadfast User, or Administrator.'
+    help = 'Create a Customer User, Internal User, or minimum Django Administrator.'
 
     def add_arguments(self, parser):
         parser.add_argument('--email', required=True)
@@ -42,7 +38,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--django-admin',
             action='store_true',
-            help='Create an Administrator. Requires internal + all clients.',
+            help='Create a normal Django Administrator. Requires internal + all clients.',
         )
         parser.add_argument('--first-name', default='')
         parser.add_argument('--last-name', default='')
@@ -85,7 +81,6 @@ class Command(BaseCommand):
             profile_role = CalculatorUserProfile.Role.CUSTOMER_USER
             scope = CalculatorUserProfile.ClientScope.SINGLE_CLIENT
             selected_clients = []
-            access_group_name = CUSTOMERS_GROUP
         else:
             if client_code:
                 raise CommandError('Internal User must not use --client.')
@@ -96,7 +91,7 @@ class Command(BaseCommand):
                     'Internal User requires --all-clients or at least one --allowed-client.'
                 )
             if django_admin and not all_clients:
-                raise CommandError('Administrator requires --all-clients.')
+                raise CommandError('Django Administrator requires --all-clients.')
 
             client = None
             profile_role = CalculatorUserProfile.Role.INTERNAL_USER
@@ -117,16 +112,6 @@ class Command(BaseCommand):
                 raise CommandError(
                     'Active client(s) not found: ' + ', '.join(sorted(missing_codes))
                 )
-            access_group_name = (
-                ADMINISTRATORS_GROUP if django_admin else STEADFAST_USERS_GROUP
-            )
-
-        access_group = Group.objects.filter(name=access_group_name).first()
-        if access_group is None:
-            raise CommandError(
-                f'Group "{access_group_name}" does not exist. '
-                'Run setup_access_roles first.'
-            )
 
         user = User(
             username=email,
@@ -164,13 +149,19 @@ class Command(BaseCommand):
         if selected_clients:
             profile.allowed_clients.set(selected_clients)
 
-        user.groups.add(access_group)
+        if django_admin:
+            group = Group.objects.filter(name=DJANGO_ADMINISTRATOR_GROUP).first()
+            if group is None:
+                raise CommandError(
+                    f'Group "{DJANGO_ADMINISTRATOR_GROUP}" does not exist. '
+                    'Run setup_access_roles first.'
+                )
+            user.groups.add(group)
 
         self.stdout.write(self.style.SUCCESS(
             f'Created {profile.get_role_display()}: {email}'
         ))
         self.stdout.write(f'Client scope: {profile.get_client_scope_display()}')
-        self.stdout.write(f'Primary access group: {access_group_name}')
         if django_admin:
             self.stdout.write('Django Admin: enabled as non-superuser administrator.')
         if not options['set_password']:

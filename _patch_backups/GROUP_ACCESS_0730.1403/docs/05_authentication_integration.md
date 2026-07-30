@@ -53,7 +53,7 @@ The freight views call this service before loading products, selecting addresses
 /api/suburbs/      authenticated autocomplete
 /api/products/     authenticated and client-scoped
 /api/calculate/    authenticated and client-scoped
-/admin/            Super User or approved Administrators member
+/admin/            Technical Superuser or approved Django Administrator
 ```
 
 Anonymous API calls return JSON HTTP 401. Authenticated users without calculator entitlement receive HTTP 403.
@@ -86,7 +86,7 @@ docker compose exec -it web python manage.py create_calculator_user `
   --set-password
 ```
 
-Create an Administrator:
+Create minimum Django Administrator:
 
 ```powershell
 docker compose exec web python manage.py setup_access_roles
@@ -99,10 +99,10 @@ docker compose exec -it web python manage.py create_calculator_user `
   --set-password
 ```
 
-Create the designated Super User:
+Create Technical Superuser:
 
 ```powershell
-docker compose exec -it web python manage.py createsuperuser --username super
+docker compose exec -it web python manage.py createsuperuser
 ```
 
 ## 7. Pending phase
@@ -149,20 +149,4 @@ The dedicated stylesheet is `app/static/css/login.css`. It is intentionally sepa
 ## Unified Django Admin workflow
 
 `auth.User` remains the identity source and `CalculatorUserProfile` remains the calculator-authorization source. Both are displayed in one User add/change screen. The profile is optional.
-
-## Group-based User administration — 2026-07-30
-
-Normal User administration uses exactly one primary access group:
-
-```text
-Administrators
-Customers
-Steadfast Users
-```
-
-The User form no longer exposes `user_permissions`, `is_staff` or
-`is_superuser`. Permissions are configured in Groups. Saving a normal user
-synchronises the calculator profile and staff status from the selected primary
-group. The `super` account is a native Django Super User and does not require a
-primary group or calculator profile.
 

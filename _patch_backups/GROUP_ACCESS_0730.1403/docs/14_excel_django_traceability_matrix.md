@@ -129,11 +129,10 @@ Esta versión fue contrastada con el código actualizado y con `V2026.R2_Unlocke
 | trace_id | Requirement/source | Delivered source | Runtime evidence in package | Status/risk |
 |---|---|---|---|---|
 | `AUTH-ROLE-001` | Customer User and Internal User only | `CalculatorUserProfile` with two role choices | migrations applied; complete suite did not finish | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
-| `AUTH-ADMIN-001` | Django Admin separate from calculator role | `Administrators` group plus native Super User `super` boundary | source updated; targeted Docker tests required | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
+| `AUTH-ADMIN-001` | Django Admin separate from calculator role | Django Administrator group plus Technical Superuser boundary | migrations and `manage.py check` passed; targeted tests not captured as complete | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
 | `AUTH-LOGIN-001` | Login by normalized email | built-in User with normalized email in username/email for calculator accounts | source and templates present; complete suite did not finish | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
 | `AUTH-CLIENT-001` | User client scope | centralized authorized-client resolver and protected calculator APIs | tests present; execution must be rerun | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
 | `AUTH-MW-001` | Admin authorization boundary | `DjangoAdminAccessMiddleware` plus profile/group requirements | middleware source present; execution must be rerun | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
 | `AUTH-ADMIN-PERM-001` | Least-privilege Admin | explicit validate/activate/rollback/download permissions | migration `imports.0004` applied; targeted tests not captured as complete | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
-| `AUTH-USER-ADMIN-001` | One user-management workflow | primary group and Customer client in UserAdmin; individual permissions hidden; standalone profile menu hidden | 10 UserAdmin/group integration tests passed in review runtime; Docker installer rechecks | IMPLEMENTED / TARGETED_TESTS_PASS |
-| `AUTH-GROUP-001` | Group-only normal-user permissions | `Administrators`, `Customers`, `Steadfast Users`; group-to-profile/staff synchronisation | 28 affected access/admin/command/login-flow tests passed; 31 freight/import/client regressions passed | IMPLEMENTED / TARGETED_TESTS_PASS |
+| `AUTH-USER-ADMIN-001` | One user-management workflow | optional CalculatorUserProfile inline in UserAdmin; standalone menu hidden | source present; no schema migration required | IMPLEMENTED_IN_SOURCE / RUNTIME_RECHECK |
 | `AUTH-QUOTE-001` | Quotation behavior | no Quotation model and no approved quotation rules | not applicable | PENDING_SPECIFICATION |

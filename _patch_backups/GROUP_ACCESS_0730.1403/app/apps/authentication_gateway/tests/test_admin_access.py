@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.authentication_gateway.models import CalculatorUserProfile
-from apps.authentication_gateway.services import ADMINISTRATORS_GROUP
+from apps.authentication_gateway.services import DJANGO_ADMINISTRATOR_GROUP
 from apps.clients.models import Client
 
 
@@ -46,7 +46,7 @@ class DjangoAdminAccessMiddlewareTests(TestCase):
             'selected@example.com',
             CalculatorUserProfile.ClientScope.SELECTED_CLIENTS,
         )
-        group = Group.objects.create(name=ADMINISTRATORS_GROUP)
+        group = Group.objects.create(name=DJANGO_ADMINISTRATOR_GROUP)
         user.groups.add(group)
         self.client.force_login(user)
         response = self.client.get(reverse('admin:index'))
@@ -58,7 +58,7 @@ class DjangoAdminAccessMiddlewareTests(TestCase):
             'admin@example.com',
             CalculatorUserProfile.ClientScope.ALL_CLIENTS,
         )
-        user.groups.add(Group.objects.get(name=ADMINISTRATORS_GROUP))
+        user.groups.add(Group.objects.get(name=DJANGO_ADMINISTRATOR_GROUP))
         self.client.force_login(user)
         response = self.client.get(reverse('admin:index'))
         self.assertEqual(response.status_code, 200)

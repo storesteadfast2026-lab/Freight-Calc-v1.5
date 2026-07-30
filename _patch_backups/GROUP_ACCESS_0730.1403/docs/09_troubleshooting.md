@@ -300,23 +300,10 @@ is_staff=True
 Internal User
 ALL_CLIENTS
 calculator_access=True
-member of Administrators
+member of Django Administrator
 ```
 
-Run `setup_access_roles`, then create or correct the user through the Super User.
-
-### User form still shows individual User permissions
-
-Rebuild the web service and confirm the group-based `STHUserAdmin` is active:
-
-```powershell
-docker compose up -d --build web
-docker compose exec web python manage.py setup_access_roles
-docker compose exec web python manage.py check
-```
-
-The User form must show `Primary access group` and must not show individual
-`User permissions`, Staff status or Superuser status.
+Run `setup_access_roles`, then create or correct the user through a Technical Superuser.
 
 ### setup_access_roles reports missing permissions
 

@@ -167,8 +167,8 @@ El cliente se valida en el backend para la página, productos y cálculo. Un `cl
 Django Admin utiliza:
 
 ```text
-Administrators       → Internal User / ALL_CLIENTS / Django Admin operacional
-Super User           → cuenta nativa `super` para setup y recuperación
+Django Administrator → Internal User / ALL_CLIENTS / grupo autorizado
+Technical Superuser  → superusuario nativo para setup y recuperación
 ```
 
 Después de aplicar las migraciones:
@@ -187,7 +187,7 @@ docker compose exec -it web python manage.py create_calculator_user `
   --set-password
 ```
 
-Crear Administrator:
+Crear Django Administrator mínimo:
 
 ```powershell
 docker compose exec -it web python manage.py create_calculator_user `
@@ -199,18 +199,6 @@ docker compose exec -it web python manage.py create_calculator_user `
 ```
 
 Ver `docs/05_authentication_integration.md`, `business_rules/users.md` y ADR 0005.
-
-### Grupos principales de usuarios
-
-```text
-Administrators
-Customers
-Steadfast Users
-```
-
-Los permisos individuales no se editan en Users. Se administran únicamente en
-Groups. El grupo seleccionado sincroniza el perfil de calculadora, el alcance
-de clientes y `is_staff`. La cuenta nativa `super` no requiere grupo principal.
 
 
 ## Cubic Margin

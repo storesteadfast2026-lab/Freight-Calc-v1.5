@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.utils.html import format_html
 
 from .forms import CalculatorUserProfileAdminForm
 from .models import CalculatorUserProfile
@@ -38,12 +37,8 @@ from django.contrib.auth import get_user_model as _get_user_model
 from django.contrib.auth.admin import UserAdmin as _DjangoUserAdmin
 from django.contrib.admin.sites import NotRegistered as _NotRegistered
 
-from .forms import STHUserChangeForm, STHUserCreationForm
-from .services import (
-    ADMINISTRATORS_GROUP,
-    configure_user_from_primary_group,
-    primary_access_group_for,
-)
+from .forms import CalculatorUserProfileInlineForm
+from .services import DJANGO_ADMINISTRATOR_GROUP
 
 
 class CalculatorProfileStatusFilter(admin.SimpleListFilter):
@@ -94,6 +89,59 @@ class CalculatorScopeFilter(admin.SimpleListFilter):
         return queryset
 
 
+class CalculatorUserProfileInline(admin.StackedInline):
+    model = CalculatorUserProfile
+    form = CalculatorUserProfileInlineForm
+    fk_name = 'user'
+    extra = 1
+    min_num = 0
+    max_num = 1
+    can_delete = True
+    filter_horizontal = ('allowed_clients',)
+    verbose_name = 'Calculator access'
+    verbose_name_plural = 'Calculator access'
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        (
+            None,
+            {
+                'fields': (
+                    'calculator_access',
+                    'role',
+                    'client_scope',
+                    'client',
+                    'allowed_clients',
+                ),
+                'description': (
+                    'Configure this block only when the account must use the '
+                    'Freight Calculator. A Technical Superuser may remain '
+                    'without a calculator profile.'
+                ),
+            },
+        ),
+        (
+            'Record information',
+            {
+                'classes': ('collapse',),
+                'fields': ('created_at', 'updated_at'),
+            },
+        ),
+    )
+
+    def has_add_permission(self, request, obj=None):
+        if not request.user.is_active or not request.user.is_superuser:
+            return False
+        if obj and CalculatorUserProfile.objects.filter(user=obj).exists():
+            return False
+        return True
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_active and request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_active and request.user.is_superuser
+
+
 try:
     admin.site.unregister(CalculatorUserProfile)
 except _NotRegistered:
@@ -117,71 +165,13 @@ except _NotRegistered:
 
 @admin.register(_User)
 class STHUserAdmin(_DjangoUserAdmin):
-    """Group-based account and calculator-access administration."""
+    """Unified account and calculator-access administration."""
 
-    form = STHUserChangeForm
-    add_form = STHUserCreationForm
-    inlines = ()
-    fieldsets = (
-        (
-            'Account',
-            {
-                'fields': ('username', 'password', 'is_active'),
-            },
-        ),
-        (
-            'Personal information',
-            {
-                'fields': ('first_name', 'last_name', 'email'),
-            },
-        ),
-        (
-            'Group-based access',
-            {
-                'fields': (
-                    'primary_access_group',
-                    'calculator_client',
-                    'effective_access_summary',
-                ),
-                'description': (
-                    'Assign one primary group. Django permissions are managed '
-                    'only in Groups; individual user permissions are not available.'
-                ),
-            },
-        ),
-        (
-            'Important dates',
-            {
-                'classes': ('collapse',),
-                'fields': ('last_login', 'date_joined'),
-            },
-        ),
-    )
-    add_fieldsets = (
-        (
-            'Account',
-            {
-                'classes': ('wide',),
-                'fields': (
-                    'username',
-                    'email',
-                    'first_name',
-                    'last_name',
-                    'is_active',
-                    'primary_access_group',
-                    'calculator_client',
-                    'password1',
-                    'password2',
-                ),
-            },
-        ),
-    )
-    readonly_fields = ('last_login', 'date_joined', 'effective_access_summary')
+    inlines = (CalculatorUserProfileInline,)
     list_display = (
         'username',
         'email',
         'is_active',
-        'primary_group',
         'calculator_status',
         'calculator_role',
         'calculator_scope',
@@ -262,75 +252,21 @@ class STHUserAdmin(_DjangoUserAdmin):
         clients = list(profile.allowed_clients.all())
         return ', '.join(client.code for client in clients) or 'No clients selected'
 
-    @admin.display(description='Primary group')
-    def primary_group(self, obj):
-        if obj.is_superuser:
-            return 'Super User'
-        try:
-            return primary_access_group_for(obj) or 'Not assigned'
-        except Exception:
-            return 'Conflicting groups'
-
     @admin.display(description='Django Admin access', ordering='is_superuser')
     def admin_level(self, obj):
         if obj.is_superuser:
-            return 'Super User'
+            return 'Technical Superuser'
         if (
             obj.is_staff
             and any(
-                group.name == ADMINISTRATORS_GROUP
+                group.name == DJANGO_ADMINISTRATOR_GROUP
                 for group in obj.groups.all()
             )
         ):
-            return 'Administrator'
+            return 'Django Administrator'
         if obj.is_staff:
             return 'Staff without approved group'
         return 'No Admin access'
-
-    @admin.display(description='Effective access')
-    def effective_access_summary(self, obj):
-        if not obj or not obj.pk:
-            return 'Effective access is calculated after the user is saved.'
-        if obj.is_superuser:
-            return format_html(
-                '<strong>Super User</strong><br>'
-                'Django Admin: full access<br>'
-                'Calculator access: optional profile<br>'
-                'Permissions source: Django is_superuser'
-            )
-
-        group_name = self.primary_group(obj)
-        profile = self._profile(obj)
-        calculator_access = (
-            'Enabled' if profile and profile.calculator_access else 'Not configured'
-        )
-        client_access = self.calculator_clients(obj)
-        admin_access = (
-            'Operational Django Admin'
-            if group_name == ADMINISTRATORS_GROUP
-            else 'No Django Admin access'
-        )
-        return format_html(
-            '<strong>{}</strong><br>'
-            'Calculator access: {}<br>'
-            'Client access: {}<br>'
-            'Django Admin: {}<br>'
-            'Individual permissions: disabled',
-            group_name,
-            calculator_access,
-            client_access,
-            admin_access,
-        )
-
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
-        if obj.is_superuser:
-            return
-        configure_user_from_primary_group(
-            obj,
-            form.cleaned_data['primary_access_group'],
-            form.cleaned_data.get('calculator_client'),
-        )
 
     def has_module_permission(self, request):
         return request.user.is_active and request.user.is_superuser

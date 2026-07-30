@@ -238,42 +238,11 @@ docker compose exec web python manage.py setup_access_roles
 docker compose exec web python manage.py check
 ```
 
-Run the stable access modules affected by group-based administration:
+Run access, freight and import tests together:
 
 ```powershell
-docker compose exec web python manage.py test `
-  apps.authentication_gateway.tests.test_access `
-  apps.authentication_gateway.tests.test_admin_access `
-  apps.authentication_gateway.tests.test_commands `
-  apps.authentication_gateway.tests.test_login_flow `
-  apps.authentication_gateway.tests.test_user_admin_integration `
-  -v 2
+docker compose exec web python manage.py test apps.authentication_gateway apps.freight apps.imports -v 2
 ```
-
-Expected current result:
-
-```text
-Found 28 test(s)
-OK
-```
-
-Then run the affected regressions:
-
-```powershell
-docker compose exec web python manage.py test apps.freight apps.imports apps.clients -v 2
-```
-
-Expected current result:
-
-```text
-Found 31 test(s)
-OK
-```
-
-The complete `apps.authentication_gateway` suite currently has four known
-baseline failures in `test_login_security`: the expected generic message does
-not match the current login form. They are not caused by group-based access and
-must be resolved as a separate login-security change.
 
 Create a local test Customer User:
 
@@ -285,7 +254,7 @@ docker compose exec -it web python manage.py create_calculator_user `
   --set-password
 ```
 
-Create a local test Administrator:
+Create a local test Django Administrator:
 
 ```powershell
 docker compose exec -it web python manage.py create_calculator_user `

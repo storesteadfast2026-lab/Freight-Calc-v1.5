@@ -1,7 +1,18 @@
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.core.exceptions import ValidationError
 
+from apps.clients.models import Client
+
 from .models import CalculatorUserProfile
+from .services import (
+    ADMINISTRATORS_GROUP,
+    CUSTOMERS_GROUP,
+    PRIMARY_ACCESS_GROUPS,
+    STEADFAST_USERS_GROUP,
+    primary_access_group_for,
+)
 
 
 class CalculatorUserProfileAdminForm(forms.ModelForm):
@@ -71,73 +82,106 @@ class CalculatorUserProfileAdminForm(forms.ModelForm):
         return cleaned
 
 
-# USER_ADMIN_INTEGRATION_0727.0802
-class CalculatorUserProfileInlineForm(CalculatorUserProfileAdminForm):
-    """Profile form embedded in Django's User administration screen."""
+PRIMARY_ACCESS_GROUP_CHOICES = (
+    (ADMINISTRATORS_GROUP, 'Administrators — Calculator and operational Django Admin'),
+    (CUSTOMERS_GROUP, 'Customers — Calculator for one client'),
+    (STEADFAST_USERS_GROUP, 'Steadfast Users — Internal calculator access'),
+)
+
+
+def _primary_access_group_field():
+    return forms.ChoiceField(
+        label='Primary access group',
+        choices=PRIMARY_ACCESS_GROUP_CHOICES,
+        required=True,
+        help_text=(
+            'Permissions are inherited from this group. Individual user '
+            'permissions are disabled.'
+        ),
+    )
+
+
+def _calculator_client_field():
+    return forms.ModelChoiceField(
+        label='Customer client',
+        queryset=Client.objects.none(),
+        required=False,
+        help_text='Required only for Customers.',
+    )
+
+
+class PrimaryAccessFieldsMixin:
+    """Clear group-based access behavior shared by User add/change forms."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['calculator_client'].queryset = Client.objects.filter(
+            active=True
+        ).order_by('code')
 
-        access_field = self.fields['calculator_access']
-        access_field.label = 'Enable calculator access'
-        access_field.help_text = (
-            'Leave this clear and leave the remaining fields blank for a '
-            'Django-only account.'
-        )
-        self.fields['role'].help_text = (
-            'Customer User is limited to one client. Internal User can use '
-            'all clients or a selected list.'
-        )
-        self.fields['client_scope'].help_text = (
-            'Customer User: Single client. Internal User: All clients or '
-            'Selected clients.'
-        )
+        user = self.instance
+        if user and user.pk:
+            if user.is_superuser:
+                self.fields['primary_access_group'].required = False
+                self.fields['primary_access_group'].disabled = True
+                self.fields['calculator_client'].disabled = True
+                self.fields['primary_access_group'].help_text = (
+                    'Super User access comes from Django is_superuser and does '
+                    'not require a primary access group.'
+                )
+            else:
+                try:
+                    self.initial['primary_access_group'] = primary_access_group_for(user)
+                except ValidationError:
+                    # Preserve a visible validation error in clean() without
+                    # guessing which conflicting group should win.
+                    self.initial['primary_access_group'] = ''
 
-        # A blank new inline must not silently create calculator access.
-        if not self.instance.pk:
-            self.initial['calculator_access'] = False
-            self.instance.calculator_access = False
+            try:
+                profile = user.calculator_profile
+            except CalculatorUserProfile.DoesNotExist:
+                profile = None
+            if profile and profile.role == CalculatorUserProfile.Role.CUSTOMER_USER:
+                self.initial['calculator_client'] = profile.client_id
 
     def clean(self):
         cleaned = super().clean()
-
-        # In an inline form the parent User may be attached to the model
-        # instance rather than present in cleaned_data. Apply the same
-        # user-specific validations in that case.
-        if cleaned.get('user') is not None:
+        user = self.instance
+        if user and user.pk and user.is_superuser:
             return cleaned
 
-        user = self.instance._state.fields_cache.get('user')
-        if user is None and self.instance.user_id:
-            user = self.instance.user
-        if user is None:
-            return cleaned
-
-        role = cleaned.get('role')
-        scope = cleaned.get('client_scope')
-
-        if role == CalculatorUserProfile.Role.CUSTOMER_USER and user.is_staff:
+        group_name = cleaned.get('primary_access_group')
+        client = cleaned.get('calculator_client')
+        if group_name not in PRIMARY_ACCESS_GROUPS:
+            self.add_error('primary_access_group', 'Select one primary access group.')
+        elif group_name == CUSTOMERS_GROUP:
+            if client is None:
+                self.add_error(
+                    'calculator_client',
+                    'Customers require one active client.',
+                )
+        elif client is not None:
             self.add_error(
-                None,
-                'Customer User cannot have Django Admin access.',
+                'calculator_client',
+                'Only Customers use the single Customer client field.',
             )
-
-        if (
-            role == CalculatorUserProfile.Role.INTERNAL_USER
-            and user.is_staff
-            and not user.is_superuser
-            and scope != CalculatorUserProfile.ClientScope.ALL_CLIENTS
-        ):
-            self.add_error(
-                'client_scope',
-                'A normal Django Administrator must be Internal User / All clients.',
-            )
-
-        if not user.is_active and cleaned.get('calculator_access'):
-            raise ValidationError(
-                'Inactive Django users cannot have effective calculator access. '
-                'Disable calculator access or reactivate the user.'
-            )
-
         return cleaned
+
+
+class STHUserCreationForm(PrimaryAccessFieldsMixin, UserCreationForm):
+    primary_access_group = _primary_access_group_field()
+    calculator_client = _calculator_client_field()
+
+    class Meta(UserCreationForm.Meta):
+        model = get_user_model()
+        fields = ('username', 'email', 'first_name', 'last_name', 'is_active')
+
+
+class STHUserChangeForm(PrimaryAccessFieldsMixin, UserChangeForm):
+    primary_access_group = _primary_access_group_field()
+    calculator_client = _calculator_client_field()
+
+    class Meta(UserChangeForm.Meta):
+        model = get_user_model()
+        fields = ('username', 'email', 'first_name', 'last_name', 'is_active')
 

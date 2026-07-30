@@ -17,7 +17,7 @@
 ## DEC-003 — Minimum Django Admin profiles
 
 - **Status:** Accepted and implemented in source.
-- **Decision:** Use the protected groups `Administrators`, `Customers` and `Steadfast Users`, plus the exceptional native Super User account `super`.
+- **Decision:** Use one `Django Administrator` group plus exceptional native Technical Superusers.
 
 ## DEC-004 — Existing Django user model
 
@@ -47,7 +47,7 @@
 ## DEC-009 — Administrator scope and privilege escalation
 
 - **Status:** Accepted and implemented in source.
-- **Decision:** Members of `Administrators` must be Internal User / All clients. User, Group, Permission and superuser management remain Super-User-only.
+- **Decision:** Normal Django Administrators must be Internal User / All clients. User, Group, Permission and superuser management remain Technical-Superuser-only.
 
 ## DEC-010 — Import action permissions
 
@@ -86,11 +86,3 @@
 
 - **Status:** Accepted on 2026-07-28.
 - **Decision:** `business_rules/`, `decisions/functional_decisions.md`, numbered `docs/` files and uniquely numbered ADRs are canonical. Duplicate historical paths remain only as explicit pointers and must not contain competing rules.
-
-## DEC-017 — Group-only user permissions
-
-- **Status:** Accepted and implemented in source on 2026-07-30.
-- **Decision:** User administration does not expose individual permissions. Every normal user receives one protected primary group: `Administrators`, `Customers` or `Steadfast Users`.
-- **Mapping:** The primary group synchronises calculator role, client scope and staff status. Client isolation remains stored in `CalculatorUserProfile`.
-- **Super User:** The native account `super` remains outside the protected-group requirement and receives permissions through `is_superuser`.
-- **Transition safety:** Existing individual permissions are reported by `setup_access_roles` but are not silently deleted.

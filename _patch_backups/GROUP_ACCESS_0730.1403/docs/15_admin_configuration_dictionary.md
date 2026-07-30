@@ -63,18 +63,18 @@ Product/Stock rows must never show `Activate` or `Rollback`.
 |---|---|
 | Customer User | Calculator role; exactly one active client; never staff |
 | Internal User | Calculator role; all or selected active clients |
-| Administrator | `Administrators` group; Internal User with ALL_CLIENTS and automatic `is_staff` |
-| Super User | Native Django superuser account `super`; primary group and calculator profile optional |
+| Django Administrator | Internal User with ALL_CLIENTS, `is_staff` and approved group membership |
+| Technical superuser | Exceptional native Django superuser account, not a calculator role |
 
-Sensitive Fuel and source operations use explicit permissions inherited from `Administrators`. Group records, Permission records and superuser status remain controlled by the Super User to avoid privilege escalation.
+Sensitive Fuel and source operations now require explicit permissions. Django Administrator membership, Django Group records, Permission records and superuser status remain controlled by Technical Superusers to avoid privilege escalation.
 
 ## User and permission configuration — 2026-07-22
 
 ### Calculator User Profiles
 
-The standalone profile view remains visible only to the Super User. Normal Users are configured through the group-based User form.
+Visible only to Technical Superusers. Normal Django Administrators cannot create or change profiles in Version 1.
 
-### Administrators group
+### Django Administrator group
 
 Created idempotently with:
 
@@ -93,30 +93,15 @@ It grants view/add/change for current operational configuration models, view-onl
 | `rollback_fuel` | Restore values before an activation |
 | `download_external_data_file` | Download stored source file |
 
-### Super User
+### Technical Superuser
 
-Created with Django `createsuperuser --username super`. Use for user/group administration, recovery and exceptional operations.
+Created with Django `createsuperuser`. Use only for user/profile/group administration, recovery and exceptional technical operations.
 
 
 <!-- USER_ADMIN_INTEGRATION_0727.0802 -->
 ## Authentication and Authorization > Users
 
 The list displays calculator status, role, client scope, client access and Django Admin level. The User form includes an optional Calculator access block. The standalone profile model is hidden from the menu.
-
-## Group-only User form — 2026-07-30
-
-The User add/change form now exposes `Primary access group` and, only when
-needed, `Customer client`. It does not expose individual `User permissions`,
-manual Staff status or manual Superuser status.
-
-| Primary group | Calculator mapping | Django Admin |
-|---|---|---|
-| Administrators | Internal User / All clients | Operational access |
-| Customers | Customer User / Single client | None |
-| Steadfast Users | Internal User / All clients | None |
-
-The effective-access summary is read-only and shows the source group, calculator
-scope and Django Admin level.
 
 
 ## FreightCalculator Admin visibility decision — 2026-07-27

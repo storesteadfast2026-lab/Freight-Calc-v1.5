@@ -29,7 +29,7 @@ The resolved `Client.code`, not the untrusted browser value, is passed to `Freig
 
 ## 5. Django Admin limitation in Version 1
 
-Members of `Administrators` use `ALL_CLIENTS`. Selected-client Django Admin scoping is intentionally not implemented because it would require object-level query, relation and custom-action filtering throughout Admin.
+Normal Django Administrators use `ALL_CLIENTS`. Selected-client Django Admin scoping is intentionally not implemented because it would require object-level query, relation and custom-action filtering throughout Admin.
 
 ## 6. Future extension
 

@@ -8,46 +8,90 @@ Django Admin
 -> Users
 ```
 
-The separate Calculator User Profiles menu is hidden to avoid two normal workflows.
+Only the native Super User administers Users and Groups.
 
-## Customer User
+## Primary access groups
 
-1. Create the Django user and password.
-2. In Calculator access, select Enable calculator access.
-3. Select Customer User.
-4. Select Single client.
-5. Select one active client.
-6. Leave Allowed clients empty.
-7. Do not enable Staff or Superuser.
+Every normal user must have exactly one:
 
-## Internal User
+```text
+Administrators
+Customers
+Steadfast Users
+```
 
-1. Create the Django user and password.
-2. Enable calculator access.
-3. Select Internal User.
-4. Select All clients or Selected clients.
-5. For Selected clients, choose at least one active client.
-6. Leave the single Client field empty.
+Individual User permissions are not available. Configure operational
+permissions under:
 
-## Technical Superuser
+```text
+Django Admin
+-> Authentication and Authorization
+-> Groups
+```
 
-A Technical Superuser may remain without a calculator profile. The Users list must then show Calculator status: Not configured. Configure the calculator block only when that account must also use the calculator.
+## Administrator
 
-## Status interpretation
+1. Create or open the User.
+2. Select `Administrators`.
+3. Leave Customer client empty.
+4. Save.
 
-- Active: the Django identity can authenticate.
-- Calculator status: the account has an enabled calculator profile.
-- Staff status: the account may access Django Admin when authorization permits.
-- Superuser: unrestricted Django Admin permissions.
-- Not configured: no CalculatorUserProfile exists.
-- Disabled: a profile exists but calculator_access is false.
+The system applies Internal User, All clients, calculator access and
+`is_staff=True`. It does not grant User, Group, Permission or superuser
+management.
+
+## Customer
+
+1. Create or open the User.
+2. Select `Customers`.
+3. Select exactly one active Customer client.
+4. Save.
+
+The system applies Customer User, Single client, calculator access and
+`is_staff=False`.
+
+## Steadfast User
+
+1. Create or open the User.
+2. Select `Steadfast Users`.
+3. Leave Customer client empty.
+4. Save.
+
+The system applies Internal User, All clients, calculator access and
+`is_staff=False`. Future quotation permissions require an approved Quotation
+specification and model before being assigned to this group.
+
+## Super User
+
+The designated native account is:
+
+```text
+super
+```
+
+It does not require a primary access group. Its calculator profile is optional.
+Create it interactively:
+
+```powershell
+docker compose exec -it web python manage.py createsuperuser --username super
+```
+
+## Setup command
+
+```powershell
+docker compose exec web python manage.py setup_access_roles
+```
+
+The command creates or updates the three protected groups. When safe, it
+renames the legacy `Django Administrator` group to `Administrators`. It reports
+existing individual permissions but does not remove them automatically.
 
 ## Troubleshooting order
 
-1. Confirm Active.
-2. Confirm the password is usable.
-3. Read Calculator status in the Users list.
-4. Inspect the Calculator access block.
-5. Confirm role and client scope are consistent.
-6. Confirm Customer User has one active client.
-7. Confirm Internal / Selected clients has at least one active client.
+1. Confirm the User is Active.
+2. Confirm exactly one primary group.
+3. For Customers, confirm one active client.
+4. Read the Effective access summary.
+5. Confirm Administrators have Internal User / All clients.
+6. Confirm Customers and Steadfast Users are not staff.
+7. Review any individual-permission warning from `setup_access_roles`.

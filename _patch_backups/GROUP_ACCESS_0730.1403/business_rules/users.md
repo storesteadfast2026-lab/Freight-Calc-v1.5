@@ -43,7 +43,7 @@ User.username
 User.email
 ```
 
-`User.username` remains the unique database login identifier. The native Super User account may retain the non-email username `super`.
+`User.username` remains the unique database login identifier. Existing Technical Superusers may retain non-email usernames.
 
 ## USR-005 — Account status
 
@@ -51,7 +51,7 @@ User.email
 
 ## USR-006 — Minimum Django Admin model
 
-### Administrator
+### Django Administrator
 
 A normal administrator must satisfy all conditions:
 
@@ -60,13 +60,13 @@ A normal administrator must satisfy all conditions:
 - calculator role `INTERNAL_USER`;
 - scope `ALL_CLIENTS`;
 - enabled calculator access;
-- membership in group `Administrators`.
+- membership in group `Django Administrator`.
 
 The group receives operational model permissions and explicit import-action permissions. It does not receive User, Group, Permission or superuser-management permissions.
 
-### Super User
+### Technical Superuser
 
-A Super User is a native Django superuser reserved for setup, recovery and exceptional administration. The designated account name is `super`. It is not a calculator business role and does not require a primary access group.
+A Technical Superuser is a native Django superuser reserved for setup, recovery and exceptional technical administration. It is not a calculator business role.
 
 ## USR-007 — Backend authorization boundary
 
@@ -83,7 +83,7 @@ Client authorization is resolved centrally in `apps.authentication_gateway.servi
 
 ## USR-008 — User creation
 
-Version 1 creates calculator users through the Super-User-controlled management command:
+Version 1 creates calculator users through the Technical Superuser-controlled management command:
 
 ```text
 python manage.py create_calculator_user
@@ -105,22 +105,3 @@ All rejected calculator login attempts must return the same visible message, reg
 ## BR-USER-ADMIN-001 — One normal administration workflow
 
 The normal workflow is `Authentication and Authorization > Users`. Creating or enabling `auth.User` alone does not grant calculator access. A blank calculator block must not create access automatically.
-
-## BR-USER-GROUP-001 — Group-only permission assignment
-
-Normal users must use exactly one protected primary access group:
-
-```text
-Administrators
-Customers
-Steadfast Users
-```
-
-Individual `User.user_permissions` are not editable from User administration.
-Operational Django permissions are assigned only to Groups.
-
-- `Administrators`: Internal User, All clients, calculator enabled and `is_staff=True`.
-- `Customers`: Customer User, Single client, calculator enabled and `is_staff=False`.
-- `Steadfast Users`: Internal User, All clients, calculator enabled and `is_staff=False`.
-
-Only the native Super User can manage Users, Groups and group permissions.
