@@ -53,13 +53,3 @@ Do not change product-derived calculation behavior only to satisfy a Django test
 2. the matching Excel baseline;
 3. a Django comparison report;
 4. updates to the calculation flow, traceability matrix and validation findings log.
-
-## PROD-007 — ProductKitComponent Admin visibility
-
-`ProductKitComponent` is an initial compatibility model for the workbook
-`SKU-Kits` concept. No current calculation, import, view or service references
-this model. It is therefore not exposed in Django Admin.
-
-The model, database table, migration and any existing records are retained.
-This is a visibility decision only and does not prove that kit expansion is
-implemented.

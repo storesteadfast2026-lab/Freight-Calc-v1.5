@@ -327,19 +327,6 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py setup_access_roles
 ```
 
-### Product kit components still appears in Django Admin
-
-The model is intentionally hidden because no current calculation, import, view
-or service uses it. Rebuild the web image and force-refresh the Admin:
-
-```powershell
-docker compose up -d --build web
-docker compose exec web python manage.py check
-```
-
-Then use `Ctrl + Shift + R`. `Products > Products` must remain visible, while
-`Products > Product kit components` must not appear.
-
 ### User cannot log in after command creation
 
 Without `--set-password`, the command intentionally creates an unusable password. Set one securely:

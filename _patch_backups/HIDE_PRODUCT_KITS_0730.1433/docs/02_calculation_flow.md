@@ -152,9 +152,3 @@ Legacy workbook values remain a bootstrap/fixed-baseline mechanism. When an Admi
 Authentication does not alter the freight formula. Before `FreightCalculatorService.calculate()` is called, the web layer resolves an authorized Client from the authenticated user's profile. The service receives that server-approved `client.code` in `FreightRequest.client_code`.
 
 This change must not modify consolidation, zone resolution, rate selection, surcharge, fuel, uprate or display rounding behavior. Existing Excel-vs-Django batteries remain the functional regression authority.
-
-## Product kit model boundary — 2026-07-30
-
-The current calculation flow does not query `ProductKitComponent`. Hiding that
-model from Django Admin changes only menu visibility; it does not add, remove or
-alter SKU-kit expansion in the calculation.

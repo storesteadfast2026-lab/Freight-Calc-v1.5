@@ -169,24 +169,6 @@ Record the actual `OK` result; do not infer it solely from source inspection. Th
 
 ## Validate the three Django Admin source modules
 
-### Validate Product Admin visibility
-
-```powershell
-docker compose exec web python manage.py check
-docker compose exec web python manage.py makemigrations products --check --dry-run
-docker compose exec web python manage.py test apps.products.tests.test_admin_visibility -v 2
-```
-
-Expected result:
-
-```text
-Found 2 test(s)
-OK
-```
-
-Confirm manually that `Products > Products` remains visible and
-`Products > Product kit components` is absent.
-
 ### Migration and system check
 
 ```powershell

@@ -94,9 +94,3 @@
 - **Mapping:** The primary group synchronises calculator role, client scope and staff status. Client isolation remains stored in `CalculatorUserProfile`.
 - **Super User:** The native account `super` remains outside the protected-group requirement and receives permissions through `is_superuser`.
 - **Transition safety:** Existing individual permissions are reported by `setup_access_roles` but are not silently deleted.
-
-## DEC-018 — Hide ProductKitComponent from Django Admin
-
-- **Status:** Accepted and implemented in source on 2026-07-30.
-- **Decision:** Keep the `ProductKitComponent` model, table, migration and data, but remove its Django Admin registration while no current calculation, import, view or service uses it.
-- **Reversibility:** Restore Admin registration only after its operational purpose and workbook behavior are confirmed.
