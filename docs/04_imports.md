@@ -14,6 +14,34 @@ docker compose exec web python manage.py import_sth_excel /app/sample_data/V2026
 
 This channel loads workbook tables such as SKUs, suburbs, carrier configuration, zones, rates and workbook/bootstrap fuel.
 
+### 1.1.1 Destructive scope of `--replace`
+
+`import_sth_excel --replace` is not an isolated read operation. For the selected
+client it deletes and rebuilds:
+
+```text
+Product
+FreightRate
+FreightZone
+CarrierTailgateCharge
+ClientCarrierConfig
+```
+
+It also deletes every `ExternalDataFile` for that client except `FUEL`.
+Because `ProductSourceRow` and `StockSourceRow` use cascading foreign keys,
+their database rows are deleted with the corresponding Product/Stock file
+records. Django does not automatically remove the physical uploaded files, so
+orphaned files may remain under `uploaded_data/`.
+
+Consequences:
+
+- do not run `--replace` against the operational database merely to execute an
+  Excel-vs-Django battery;
+- use the isolated-database procedure in `docs/11_validation_runbook.md`;
+- preserve a PostgreSQL backup before any intentional operational replacement;
+- Fuel history is retained, but active Fuel is reapplied only after the normal
+  import/validation path completes.
+
 ### 1.2 Three Django Admin source files
 
 Django Admin currently accepts three external source types:
@@ -149,7 +177,7 @@ docker compose exec web python manage.py import_sth_excel <baseline.xlsx> --clie
 Imports → External data files → Fetch fuel from source
 ```
 
-Default URL:
+Initial fallback URL:
 
 ```text
 https://www.poscat.com.au/fuelsc/fuel.csv
@@ -162,6 +190,19 @@ FUEL_SOURCE_URL
 FUEL_FETCH_TIMEOUT_SECONDS
 FUEL_RATE_MAX
 ```
+
+The Fetch page exposes the source URL as an editable HTTP/HTTPS field. For each
+client, the next Fetch page uses the latest URL belonging to an
+`ADMIN_WEB_FETCH` Fuel record that reached a successfully validated lifecycle
+status. If none exists, it uses `FUEL_SOURCE_URL`.
+
+Changing the URL does not activate Fuel rates. The downloaded snapshot still
+passes the existing validation and requires explicit activation. The selected
+URL is stored in `ExternalDataFile.source_url` and in Fuel audit metadata.
+
+Product and Stock continue to use local browser uploads. Django records the
+original filename and stored server path, but cannot read or prefill the local
+Windows directory selected by the user.
 
 ### Upload local CSV
 
@@ -224,7 +265,11 @@ imports.rollback_fuel
 imports.download_external_data_file
 ```
 
-Standard model permissions continue to govern upload, change and read-only records. The package confirms that migration `imports.0004_external_data_file_permissions` is applied, but the complete targeted test run must still be captured before release approval.
+Standard model permissions continue to govern upload, change and read-only
+records. Migration `imports.0004_external_data_file_permissions` is applied in
+the retained deployment evidence. The current source contains 10 Fuel and 6
+Product/Stock tests; the remembered-URL installer result must still be captured
+before approving that latest change.
 
 ## 9. Verification commands
 

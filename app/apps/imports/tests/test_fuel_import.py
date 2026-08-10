@@ -136,19 +136,117 @@ class FuelImportTests(TestCase):
         page = self.client.get(reverse('admin:imports_externaldatafile_fetch_fuel'))
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, 'https://www.poscat.com.au/fuelsc/fuel.csv')
+        self.assertContains(page, 'name="source_url"')
 
+        source_url = 'https://www.poscat.com.au/fuelsc/fuel.csv'
+        with patch(
+            'apps.imports.services.fuel.download_source',
+            return_value=(VALID_CSV, 'text/csv'),
+        ) as download_mock:
+            response = self.client.post(
+                reverse('admin:imports_externaldatafile_fetch_fuel'),
+                {
+                    'client': self.client_obj.pk,
+                    'source_url': source_url,
+                    'notes': 'Manual weekly check',
+                },
+            )
+        self.assertEqual(response.status_code, 302)
+        download_mock.assert_called_once_with(source_url)
+        downloaded = ExternalDataFile.objects.get(source_method='ADMIN_WEB_FETCH')
+        self.assertEqual(downloaded.status, 'VALIDATED')
+        self.assertEqual(downloaded.source_url, source_url)
+        self.assertTrue(AuditEvent.objects.filter(event_type='FUEL_FETCH_COMPLETED').exists())
+
+    def test_admin_fetch_remembers_last_valid_url_for_client(self):
+        self.client.force_login(self.user)
+        custom_url = 'https://fuel.example.com/current/fuel.csv'
         with patch(
             'apps.imports.services.fuel.download_source',
             return_value=(VALID_CSV, 'text/csv'),
         ):
             response = self.client.post(
                 reverse('admin:imports_externaldatafile_fetch_fuel'),
-                {'client': self.client_obj.pk, 'notes': 'Manual weekly check'},
+                {
+                    'client': self.client_obj.pk,
+                    'source_url': custom_url,
+                    'notes': 'New official location',
+                },
             )
         self.assertEqual(response.status_code, 302)
-        downloaded = ExternalDataFile.objects.get(source_method='ADMIN_WEB_FETCH')
-        self.assertEqual(downloaded.status, 'VALIDATED')
-        self.assertTrue(AuditEvent.objects.filter(event_type='FUEL_FETCH_COMPLETED').exists())
+
+        page = self.client.get(reverse('admin:imports_externaldatafile_fetch_fuel'))
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.context['form']['source_url'].value(), custom_url)
+
+    def test_admin_fetch_keeps_remembered_urls_separate_by_client(self):
+        other_client = Client.objects.create(code='OTHER', name='Other Client', active=True)
+        sth_url = 'https://fuel.example.com/sth/fuel.csv'
+        other_url = 'https://fuel.example.com/other/fuel.csv'
+        for client_obj, source_url in (
+            (self.client_obj, sth_url),
+            (other_client, other_url),
+        ):
+            ExternalDataFile.objects.create(
+                client=client_obj,
+                file_type='FUEL',
+                source_method='ADMIN_WEB_FETCH',
+                source_url=source_url,
+                original_filename='fuel.csv',
+                status='VALIDATED',
+                validated_by=self.user,
+            )
+
+        self.client.force_login(self.user)
+        page = self.client.get(reverse('admin:imports_externaldatafile_fetch_fuel'))
+        source_map = page.context['source_urls_by_client']
+        self.assertEqual(source_map[str(self.client_obj.pk)], sth_url)
+        self.assertEqual(source_map[str(other_client.pk)], other_url)
+        self.assertEqual(page.context['form']['source_url'].value(), sth_url)
+
+    def test_failed_validation_does_not_replace_remembered_url(self):
+        validated_url = 'https://fuel.example.com/validated/fuel.csv'
+        failed_url = 'https://fuel.example.com/failed/fuel.csv'
+        ExternalDataFile.objects.create(
+            client=self.client_obj,
+            file_type='FUEL',
+            source_method='ADMIN_WEB_FETCH',
+            source_url=validated_url,
+            original_filename='fuel.csv',
+            status='VALIDATED',
+            validated_by=self.user,
+        )
+        ExternalDataFile.objects.create(
+            client=self.client_obj,
+            file_type='FUEL',
+            source_method='ADMIN_WEB_FETCH',
+            source_url=failed_url,
+            original_filename='fuel.csv',
+            status='VALIDATION_FAILED',
+            validated_by=self.user,
+        )
+
+        self.client.force_login(self.user)
+        page = self.client.get(reverse('admin:imports_externaldatafile_fetch_fuel'))
+        self.assertEqual(page.context['form']['source_url'].value(), validated_url)
+
+    def test_admin_fetch_rejects_non_http_source_url(self):
+        self.client.force_login(self.user)
+        with patch('apps.imports.services.fuel.download_source') as download_mock:
+            response = self.client.post(
+                reverse('admin:imports_externaldatafile_fetch_fuel'),
+                {
+                    'client': self.client_obj.pk,
+                    'source_url': 'file:///tmp/fuel.csv',
+                    'notes': '',
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Enter a valid URL.')
+        download_mock.assert_not_called()
+        self.assertFalse(
+            ExternalDataFile.objects.filter(source_method='ADMIN_WEB_FETCH').exists()
+        )
 
     def test_expired_file_requires_superuser_force_and_justification(self):
         expired = b"""master_rate,info,rate,updated,expires,warnings\n1420,Purple,0.10,01/01/2020,02/01/2020,Expired\n"""

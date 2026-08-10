@@ -14,11 +14,13 @@ Use these canonical locations:
 ```text
 business_rules/*.md
 decisions/functional_decisions.md
-docs/00...19 numbered documents
+numbered `docs/` documents whose canonical number is identified by the documentation index
 docs/adr/0001... uniquely numbered ADRs
 ```
 
-Historical duplicate locations under `docs/business rules/` and `docs/decisions/` remain as pointer files only. They must not contain independent requirements.
+Historical duplicate locations and filenames remain as pointer files only.
+They must not declare a second ADR/document or contain independent
+requirements.
 
 Unverified calculation behavior remains marked `PENDING_EXCEL`, `PARCIAL` or `RIESGO_REVISAR`; documentation finalization must not convert unknown Excel logic into a confirmed rule.
 

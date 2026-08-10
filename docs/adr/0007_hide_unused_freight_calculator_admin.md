@@ -22,7 +22,8 @@ Remove `FreightCalculator` from Django Admin registration while retaining:
 
 ## Consequences
 
-- `Freight calculators` disappears from the Admin menu for every user, including Technical Superusers.
+- `Freight calculators` disappears from the Admin menu for every user,
+  including the native Super User.
 - The previous Admin URL is no longer registered.
 - No database migration is required.
 - No calculation rule or imported data is changed.

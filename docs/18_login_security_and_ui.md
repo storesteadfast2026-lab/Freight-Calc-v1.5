@@ -1,7 +1,7 @@
 # Login UI and User Enumeration Protection
 
-**Implemented in source:** 2026-07-24 13:26 Australia/Adelaide  
-**Status:** Implementation present in the delivered source; targeted Docker verification remains required because the complete packaged test run did not finish.
+**Implemented in source:** 2026-07-24 13:26 Australia/Adelaide
+**Status:** Visual/login flow implemented; uniform rejection behavior remains `PARTIAL / KNOWN DEFECT`.
 
 ## Visual behaviour
 
@@ -21,7 +21,8 @@ The supplied prototype JavaScript was not copied because it called `preventDefau
 
 ## Security behaviour
 
-These cases return the same browser-visible message:
+The approved requirement is that these cases return the same browser-visible
+message:
 
 - unknown username;
 - incorrect password;
@@ -39,7 +40,17 @@ The email/username or password is incorrect.
 Your account does not have access to that page.
 ```
 
-The reason is written only to the server log. A rejected login does not create an authenticated session.
+Current source status:
+
+- `CalculatorAuthenticationForm` implements the common rejection message;
+- `CalculatorLoginView` does not currently declare that authentication form;
+- normal credential errors and calculator-entitlement errors therefore follow
+  different active paths;
+- four rejection assertions in `test_login_security` remain open;
+- rejected entitlement attempts do not create an authenticated session.
+
+Do not report user-enumeration protection as complete until all five tests in
+that module pass.
 
 ## Generic 403
 

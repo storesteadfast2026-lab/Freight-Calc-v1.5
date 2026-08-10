@@ -1,7 +1,7 @@
 # Functional Decisions Log
 
-**Project:** STH Freight Calculator  
-**Last review:** 2026-07-28  
+**Project:** STH Freight Calculator
+**Last review:** 2026-08-04
 **Canonical location:** `decisions/functional_decisions.md`
 
 ## DEC-001 — Calculator roles
@@ -61,9 +61,12 @@
 
 ## DEC-012 — Calculator access errors use the login interface
 
-- **Status:** Accepted and implemented in source on 2026-07-24.
+- **Status:** Accepted; partially implemented, with a known login-form integration defect.
 - **Decision:** Calculator entitlement is checked before retaining a login session. Public entitlement failures return to the login card with a generic message instead of exposing internal profile details.
 - **Security:** CSRF remains enabled; no `csrf_exempt` workaround is permitted.
+- **Open evidence:** four rejection assertions in `test_login_security` do not
+  match the active login form. `CalculatorAuthenticationForm` is authored but
+  is not wired into `CalculatorLoginView`.
 
 ## DEC-013 — Supplied login design is the visual baseline
 
@@ -74,7 +77,7 @@
 ## DEC-014 — Integrated user administration
 
 - **Status:** Accepted and implemented in source on 2026-07-27.
-- **Decision:** Manage identity and optional `CalculatorUserProfile` in `Authentication and Authorization > Users`. Hide the standalone profile from the normal Admin index while retaining direct Technical-Superuser diagnostic access.
+- **Decision:** Manage identity and optional `CalculatorUserProfile` in `Authentication and Authorization > Users`. Hide the standalone profile from the normal Admin index while retaining direct native-Super-User diagnostic access.
 
 ## DEC-015 — Hide FreightCalculator from Django Admin
 
@@ -100,3 +103,18 @@
 - **Status:** Accepted and implemented in source on 2026-07-30.
 - **Decision:** Keep the `ProductKitComponent` model, table, migration and data, but remove its Django Admin registration while no current calculation, import, view or service uses it.
 - **Reversibility:** Restore Admin registration only after its operational purpose and workbook behavior are confirmed.
+
+## DEC-019 — Calculator presentation-only refresh
+
+- **Status:** Accepted and implemented in source on 2026-07-31.
+- **Decision:** Reorganize the current calculator into Route, Shipment, Shipment summary and Available freight options without changing its backend or request contract.
+- **Excluded:** no staged `Destination / Shipment / Compare rates` navigation, saved-shipment control, quotation history or result-detail action.
+- **Compatibility:** preserve all existing calculator field IDs, JavaScript functions, API endpoint and payload keys.
+
+## DEC-020 — Remember the last validated Fuel source URL per client
+
+- **Status:** Accepted and implemented in source on 2026-08-03; Docker execution result pending capture.
+- **Decision:** Make the Fuel fetch URL editable and derive each client's next default from its latest successfully validated `ADMIN_WEB_FETCH` record.
+- **Fallback:** Use `FUEL_SOURCE_URL` when the client has no successful fetched-Fuel history.
+- **Persistence:** Reuse `ExternalDataFile.source_url`; do not create a duplicate configuration table or migration.
+- **Boundary:** Product and Stock remain local uploads. Their filenames are recorded, but their local browser directory cannot be persisted or prefilled.

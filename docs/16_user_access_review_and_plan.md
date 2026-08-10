@@ -1,7 +1,9 @@
 # User Access Version 1 — Implementation Record
 
-**Implemented:** 2026-07-22  
-**Release state:** Implemented in source; migrations are captured as applied and `manage.py check` passed. Full/targeted test execution remains required because the packaged suite stopped while creating the test database.
+**Implemented:** 2026-07-22
+**Release state:** Core access/group behavior implemented and targeted tests
+passed. Uniform login rejection remains partial with four known
+`test_login_security` failures.
 
 ## Implemented
 
@@ -18,6 +20,8 @@
 - Read-only audit/source-row Admin access through model permissions.
 - User creation management command.
 - Authentication/access tests added.
+- Group/access/admin/login-flow targeted run: 28 tests passed.
+- Freight/import/client affected regression run: 31 tests passed.
 
 ## Not implemented
 
@@ -25,6 +29,8 @@
 - User management by Administrators; Version 1 keeps it Super-User-only by decision.
 - Object-level selected-client scoping inside Django Admin.
 - Quotation persistence and quotation permissions.
+- Complete uniform login rejection: the custom authentication form is not yet
+  connected to the active login view.
 
 ## Release checklist
 

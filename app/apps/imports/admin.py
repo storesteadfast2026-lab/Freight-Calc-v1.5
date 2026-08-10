@@ -4,7 +4,6 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import urlencode
 
-from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
@@ -16,6 +15,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
+from apps.clients.models import Client
 from apps.imports.forms import (
     ExternalDataFileAdminForm,
     FetchFuelForm,
@@ -30,6 +30,8 @@ from apps.imports.services.fuel import (
     activate_fuel_file,
     calculate_sha256,
     create_downloaded_fuel_file,
+    default_fuel_source_url,
+    remembered_fuel_source_url,
     rollback_fuel_file,
     validate_fuel_file,
 )
@@ -546,12 +548,32 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
     def fetch_fuel_view(self, request):
         if not self.has_add_permission(request):
             raise Http404
-        form = FetchFuelForm(request.POST or None)
+        active_clients = list(Client.objects.filter(active=True).order_by('code'))
+        source_urls_by_client = {
+            str(client.pk): remembered_fuel_source_url(client)
+            for client in active_clients
+        }
+        initial_client = next(
+            (client for client in active_clients if client.code.upper() == 'STH'),
+            active_clients[0] if active_clients else None,
+        )
+        initial_source_url = (
+            source_urls_by_client.get(str(initial_client.pk), default_fuel_source_url())
+            if initial_client else default_fuel_source_url()
+        )
+        form = FetchFuelForm(
+            request.POST or None,
+            initial={
+                'client': initial_client,
+                'source_url': initial_source_url,
+            },
+        )
         if request.method == 'POST' and form.is_valid():
             try:
                 external_file = create_downloaded_fuel_file(
                     client=form.cleaned_data['client'],
                     actor=request.user,
+                    source_url=form.cleaned_data['source_url'],
                     notes=form.cleaned_data['notes'],
                     request=request,
                 )
@@ -571,7 +593,7 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
             'opts': self.model._meta,
             'title': 'Fetch fuel from source',
             'form': form,
-            'source_url': settings.FUEL_SOURCE_URL,
+            'source_urls_by_client': source_urls_by_client,
         }
         return TemplateResponse(request, 'admin/imports/externaldatafile/fetch_fuel.html', context)
 

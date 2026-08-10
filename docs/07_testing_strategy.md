@@ -30,7 +30,10 @@ app/apps/freight/tests/test_cubic_margin.py
 
 They cover 0%, 10%, 20%, upward rounding to three decimals, negative values, values above 20 and decimal percentages. Because Cubic Margin is not an Excel input, these are application-rule tests. Every release must also rerun the normal 0% Excel-vs-Django batteries to prove the extension did not alter the baseline calculation path.
 
-The uploaded diagnostic did not complete the Django suite, so record the actual Docker result before marking the tests as executed.
+The seven Cubic Margin tests are included in the 63-test calculator UI
+regression run recorded on 2026-07-31. Continue recording each new Docker run;
+historical success is not a guarantee for later source changes.
+
 ## Excel vs Django validation batteries
 
 The project uses Excel-generated expected outputs to validate Django independently.
@@ -42,7 +45,7 @@ Current battery types:
 | `live_latest` | Stable real 20-case regression battery | `app/apps/freight/fixtures/live_latest/` | `reports/sth_excel_live_comparison_report.csv` |
 | `random_current` | Replaceable random exploratory battery | `app/apps/freight/fixtures/random_current/` | `reports/random_current/sth_excel_random_comparison_report.csv` |
 
-Current evidence in the 2026-07-28 review package:
+Retained evidence from the reviewed repository snapshot:
 
 ```text
 live_latest
@@ -63,6 +66,11 @@ Current reproducible status: NOT CONFIRMED
 ```
 
 A previous documented run recorded 15 random cases and 36 OK rows. Treat that as historical evidence only until a complete fixed-folder `random_current` set is regenerated and committed together. Legacy `random_5` and `random_30` folders remain in the supplied tree but must not be used for new runs.
+
+All Excel-vs-Django batteries that import with `--replace` must use an isolated
+PostgreSQL database. The validation command must include
+`--fail-on-difference`; otherwise report rows may contain `FAIL` while the
+process still returns a successful exit code.
 
 ## Validation rules
 
@@ -110,3 +118,20 @@ docker compose exec web python manage.py test apps.authentication_gateway apps.f
 ```
 
 These tests must pass together with the existing calculation and import tests. Authentication changes do not replace Excel-vs-Django validation because they do not validate freight formulas.
+
+## Current source test inventory — 2026-08-04
+
+Static test discovery in the current source contains:
+
+```text
+72 test methods total
+10 Fuel import tests
+6 Product/Stock import tests
+5 login-security tests
+```
+
+The 63-test UI regression was executed before the four additional remembered
+Fuel URL tests and intentionally excluded `test_login_security`. The current
+Fuel patch installer targets 67 tests and still excludes the five
+login-security tests. Four of those five remain a documented known failure;
+do not describe the complete 72-test suite as passing.

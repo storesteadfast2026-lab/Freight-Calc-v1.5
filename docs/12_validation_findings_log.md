@@ -1,5 +1,33 @@
 # Validation Findings Log
 
+## 2026-08-04 — Documentation and validation-safety audit
+
+- **Scope reviewed:** README plus 47 Markdown files under `business_rules/`,
+  `decisions/` and `docs/`; 4,816 lines before correction.
+- **Confirmed evidence:** `live_latest` contains 20 cases, 77 ranked outputs,
+  20 component rows and a 97-row report with 97 OK / 0 FAIL.
+- **Critical finding:** documented battery commands used
+  `--import-workbook --replace` against the running web container. The command
+  rebuilds Product/Rate/Zone/Carrier data and deletes non-Fuel
+  `ExternalDataFile` records for the client, including Product/Stock staging
+  rows by cascade.
+- **Correction:** the runbook now creates a uniquely named PostgreSQL database
+  and runs batteries through `docker compose run` with that isolated database.
+- **Exit-code finding:** without `--fail-on-difference`, a report can contain
+  FAIL rows while the management command exits successfully.
+- **Correction:** release-validation commands now include
+  `--fail-on-difference`.
+- **Authentication finding:** the generic login rule is accepted, but
+  `CalculatorAuthenticationForm` is not wired into `CalculatorLoginView`; four
+  `test_login_security` rejection assertions remain open.
+- **Documentation finding:** duplicate document 17 and ADR 0002 content,
+  obsolete review-ZIP state, stale Admin traceability and outdated import-test
+  counts were present.
+- **Calculation impact:** none. This correction changes Markdown only.
+- **Runtime result:** not applicable to a documentation-only patch; no Django
+  or Excel result is claimed by this entry.
+- **ADR:** `docs/adr/0014_isolated_excel_validation_database.md`.
+
 ## 2026-07-17 - Fuel source moved to manual Django Admin activation
 
 ### Decision
@@ -291,7 +319,10 @@ Confirmed cause: creating a user in Django Admin created `auth.User` but not `Ca
 - **Schema impact:** none; built-in User, Group, Permission and the existing CalculatorUserProfile remain unchanged.
 - **Calculation impact:** none; no freight, import, rate, Excel or Docker logic changed.
 - **Verification completed:** Django system check; 28 group/access/admin/login-flow tests; 31 freight/import/client regression tests. All passed.
-- **Known unrelated baseline:** four `test_login_security` assertions expect a generic message different from the current baseline login form. This patch does not alter that form.
+- **Known separate login issue at that time:** four `test_login_security`
+  assertions expected a generic message different from the active login form.
+  The group patch did not alter that form; the issue remains part of the login
+  security implementation and is not a passing baseline.
 - **Deployment verification:** run `setup_access_roles` only after the installer completes Django checks and the two targeted test sets.
 - **ADR:** `docs/adr/0010_group_based_user_access.md`.
 
@@ -304,3 +335,27 @@ Confirmed cause: creating a user in Django Admin created `auth.User` but not `Ca
 - **Calculation and Excel impact:** none.
 - **Verification completed:** Django check and Product migration check passed; 21 Product/Client Admin and freight regression tests passed.
 - **ADR:** `docs/adr/0011_hide_unused_product_kit_component_admin.md`.
+
+## 2026-07-31 — Calculator presentation-only refresh
+
+- **Requirement:** adopt the approved navy/gold two-column calculator design without the staged `Destination / Shipment / Compare rates` strip.
+- **Changed:** calculator template structure, calculator-scoped CSS and a display-only visible-row counter.
+- **Preserved:** all existing field IDs, JavaScript calculation/autocomplete functions, API endpoint, payload keys and backend services.
+- **Excluded:** Save shipment, quotation history, result-detail arrows and any other unimplemented action.
+- **Schema impact:** none.
+- **Calculation and Excel impact:** none.
+- **Verification completed:** Django check and migration check passed; 63 authentication, calculator, import, client and Product Admin tests passed, including two new DOM-contract tests.
+- **Browser QA:** the installer requires final visual confirmation in Docker at desktop, tablet and mobile widths.
+- **ADR:** `docs/adr/0012_calculator_visual_refresh.md`.
+
+## 2026-08-03 — Editable, remembered Fuel source URL
+
+- **Requirement:** allow an administrator to edit the Fuel fetch URL and reuse the last valid location on future fetches.
+- **Persistence:** reuse `ExternalDataFile.source_url`; choose the latest successfully validated `ADMIN_WEB_FETCH` URL separately for each client.
+- **Fallback:** retain `FUEL_SOURCE_URL`, currently `https://www.poscat.com.au/fuelsc/fuel.csv`, when no successful client history exists.
+- **Safety:** accept HTTP/HTTPS form input only; invalid input does not start a download; activation remains explicit.
+- **Product/Stock boundary:** unchanged local uploads; original filenames remain in history, while browser-local directories cannot be read or prefilled.
+- **Schema impact:** none.
+- **Calculation and Excel impact:** none.
+- **Verification authored:** default URL, custom URL hand-off and storage, per-client remembered URL, and invalid URL rejection; Docker execution required by the installer.
+- **ADR:** `docs/adr/0013_remembered_fuel_source_url.md`.

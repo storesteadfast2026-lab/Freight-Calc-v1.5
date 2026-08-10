@@ -125,6 +125,13 @@ Do not mix:
 
 Mixing them can produce false failures even when the Django calculation logic is correct.
 
+Validation execution is also isolated from operational data. Because
+`--import-workbook --replace` rebuilds client calculation tables and deletes
+non-Fuel external-file records, batteries run in a dedicated temporary
+PostgreSQL database and use `--fail-on-difference`. This safety boundary does
+not change any freight formula; see `docs/11_validation_runbook.md` and ADR
+0014.
+
 ## Fuel data source after Admin import implementation
 
 The calculation formula remains unchanged:
@@ -147,6 +154,11 @@ fuel.csv from official URL or Admin upload
 
 Legacy workbook values remain a bootstrap/fixed-baseline mechanism. When an Admin fuel dataset is active, normal workbook imports reapply it after rebuilding carrier configs.
 
+The editable and remembered Fuel source URL affects acquisition only. It does
+not change the formula, validation, explicit activation requirement or
+`ClientCarrierConfig.fuel_levy` mapping. Only a successfully activated Fuel
+snapshot can affect calculator results.
+
 ## Authentication boundary — 2026-07-22
 
 Authentication does not alter the freight formula. Before `FreightCalculatorService.calculate()` is called, the web layer resolves an authorized Client from the authenticated user's profile. The service receives that server-approved `client.code` in `FreightRequest.client_code`.
@@ -158,3 +170,21 @@ This change must not modify consolidation, zone resolution, rate selection, surc
 The current calculation flow does not query `ProductKitComponent`. Hiding that
 model from Django Admin changes only menu visibility; it does not add, remove or
 alter SKU-kit expansion in the calculation.
+
+## Calculator visual-layout boundary — 2026-07-31
+
+The responsive Route, Shipment, Shipment summary and freight-options layout is
+a presentation change only. It preserves:
+
+```text
+FreightRequest payload keys
+/api/calculate/
+calculate()
+updateProductTotals()
+suburb and product autocomplete
+server-authorized client resolution
+```
+
+Moving `total_weight`, `total_cubic` and the existing Calculate button into the
+summary panel does not change how values are derived or sent. `item_count` is a
+display-only count of visible shipment rows and is not part of the request.

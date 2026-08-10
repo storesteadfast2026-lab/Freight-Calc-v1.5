@@ -1,6 +1,6 @@
 # ADR 0006: Integrated user and calculator-access administration
 
-- Status: Accepted
+- Status: Accepted; group terminology and User form amended by ADR 0010
 - Date: 2026-07-27
 
 ## Context
@@ -11,14 +11,18 @@ Creating a user through Django Admin previously created only `auth.User`. The ca
 
 ## Decision
 
-Use `Authentication and Authorization > Users` as the normal user-management workflow. Embed the existing one-to-one `CalculatorUserProfile` as an optional inline block inside the User add/change screen.
+Use `Authentication and Authorization > Users` as the normal user-management
+workflow. The original inline-profile design was later replaced by ADR 0010's
+primary-group form while retaining the same `CalculatorUserProfile` data model.
 
-The standalone profile model remains registered for Technical Superuser diagnostics by direct URL, but is hidden from the main Admin menu. A blank calculator block creates no profile.
+The standalone profile model remains registered for native Super User
+diagnostics by direct URL, but is hidden from the main Admin menu. A blank
+calculator block creates no profile.
 
 ## Security boundaries
 
-- User management remains Technical-Superuser-only in version 1.
-- `Django Administrator` retains operational model permissions but no User, Group or Permission management.
+- User management remains native-Super-User-only in version 1.
+- `Administrators` retains operational model permissions but no User, Group or Permission management.
 - Active, Staff, Superuser and Calculator access remain independent.
 - Server-side model and form validation remain authoritative.
 

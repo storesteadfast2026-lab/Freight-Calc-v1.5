@@ -2,17 +2,21 @@
 
 Aplicación Django/PostgreSQL para migrar la lógica de la planilla `V2026.R2_Unlocked_STH_Freight_Calculator.xlsx` hacia una plataforma web multi-cliente.
 
-## Estado actual validado
+## Estado actual y evidencia
 
 El proyecto usa la planilla Excel como fuente de verdad funcional y compara los resultados calculados por Django contra expected outputs generados automáticamente desde Excel.
 
-Validación reproducible incluida en este paquete:
+Evidencia retenida para `live_latest`:
 
 ```text
 live_latest: 20 casos, 77 resultados + 20 componentes = 97 OK / 0 FAIL
 ```
 
-La documentación histórica registra una ejecución anterior de `random_current` con 15 casos y 36 OK, pero el paquete generado el 28 de julio de 2026 no contiene una batería random completa: solo incluye 5 casos y faltan outputs, componentes, baseline y reporte. Por lo tanto, ese resultado histórico no debe presentarse como reproducible desde este ZIP.
+La documentación histórica registra una ejecución anterior de `random_current`
+con 15 casos y 36 OK. El conjunto `random_current` disponible en el snapshot
+documental revisado sigue incompleto: contiene 5 casos, pero no contiene sus
+outputs, componentes, baseline y reporte emparejados. Ese resultado histórico
+no debe presentarse como una ejecución actual reproducible.
 
 Último hito documentado:
 
@@ -58,10 +62,16 @@ docker compose exec web python manage.py import_sth_excel /app/sample_data/V2026
 
 Para validar una batería, usar siempre el Excel baseline que generó sus CSV expected.
 
+La importación con `--replace` reconstruye datos del cliente y elimina de la
+base seleccionada los registros Product/Stock de referencia que no sean Fuel.
+Por eso las baterías deben ejecutarse en una base PostgreSQL aislada, nunca en
+la base operativa diaria. Seguir el procedimiento seguro de
+`docs/11_validation_runbook.md`.
+
 Ejemplo `live_latest`:
 
 ```bash
-docker compose exec web python manage.py validate_excel_battery --import-workbook --workbook /app/sample_data/live_baselines/<STH_LIVE_BASELINE>.xlsx --replace --cases /app/apps/freight/fixtures/live_latest/sth_excel_generated_cases.csv --expected /app/apps/freight/fixtures/live_latest/sth_excel_generated_outputs.csv --components /app/apps/freight/fixtures/live_latest/sth_excel_generated_components.csv --report /app/reports/sth_excel_live_comparison_report.csv
+docker compose run --rm --no-deps --env "POSTGRES_DB=<ISOLATED_VALIDATION_DB>" web python manage.py validate_excel_battery --import-workbook --workbook /app/sample_data/live_baselines/<MATCHING_BASELINE>.xlsx --replace --cases /app/apps/freight/fixtures/live_latest/sth_excel_generated_cases.csv --expected /app/apps/freight/fixtures/live_latest/sth_excel_generated_outputs.csv --components /app/apps/freight/fixtures/live_latest/sth_excel_generated_components.csv --report /app/reports/sth_excel_live_comparison_report.csv --fail-on-difference
 ```
 
 Ver más en:
@@ -106,9 +116,10 @@ docs/20_ai_project_continuation_prompt.md
 
 El prompt obliga a revisar primero la evidencia del repositorio, distingue estados de implementación y validación, conserva las rutas fijas de las baterías y evita convertir pendientes en reglas confirmadas.
 
-## Alcance del paquete de revisión
+## Proyecto completo y snapshots de revisión
 
-Este ZIP es un snapshot para revisión y no reemplaza el repositorio completo. La copia controlada del Excel está en:
+Los ZIP históricos de revisión no reemplazan el repositorio completo. En esos
+snapshots, la copia controlada del Excel puede estar en:
 
 ```text
 reference_files/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
@@ -120,7 +131,11 @@ Los comandos operativos continúan usando la ruta del proyecto completo:
 sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
 ```
 
-En el paquete faltan archivos necesarios para construir o reproducir todo desde cero, incluyendo `docker/django/Dockerfile`, el baseline emparejado de `live_latest` y el conjunto completo de `random_current`. Por eso, `manage.py check` y las migraciones capturadas son evidencia válida, pero la suite completa y la batería random deben ejecutarse en `C:\Docker-Projects\Freight-Calc-Nuevo`.
+Antes de usar un ZIP como entorno ejecutable, confirmar que incluya
+`docker/django/Dockerfile`, `sample_data/`, fixtures, baselines y reportes. El
+repositorio completo de trabajo está en
+`C:\Docker-Projects\Freight-Calc-Nuevo`; las ausencias de un snapshot antiguo
+no describen necesariamente el estado del repositorio actual.
 
 ## Autoridad documental
 
@@ -153,7 +168,7 @@ docs/04_imports.md
 docs/15_admin_configuration_dictionary.md
 ```
 
-## Usuarios y acceso — Version 1 implementada
+## Usuarios y acceso — Version 1
 
 La calculadora ahora requiere sesión Django y usa dos roles:
 
@@ -163,6 +178,12 @@ Internal User → todos los clientes o clientes seleccionados
 ```
 
 El cliente se valida en el backend para la página, productos y cálculo. Un `client_code` modificado en el navegador no permite acceder a otro cliente.
+
+La autorización y el aislamiento de clientes tienen pruebas aprobadas. La
+uniformidad completa del mensaje de rechazo de login permanece abierta: cuatro
+tests de `test_login_security` documentan la diferencia entre el formulario
+genérico esperado y la vista de login activa. No considerar cerrada esa regla
+hasta corregir el código y ejecutar esos cinco tests.
 
 Django Admin utiliza:
 
@@ -212,6 +233,31 @@ Los permisos individuales no se editan en Users. Se administran únicamente en
 Groups. El grupo seleccionado sincroniza el perfil de calculadora, el alcance
 de clientes y `is_staff`. La cuenta nativa `super` no requiere grupo principal.
 
+## Calculator visual layout — 2026-07-31
+
+The calculator uses a responsive two-column desktop layout:
+
+```text
+Route / Shipment / Results | Shipment summary / Calculate freight
+```
+
+The refresh is presentation-only. Existing DOM identifiers, JavaScript
+functions, request payload, API endpoint and calculation services are retained.
+No staged `Destination / Shipment / Compare rates` navigation and no
+unimplemented quotation controls are included.
+
+
+## Remembered Fuel source URL — 2026-08-03
+
+`Imports → External data files → Fetch fuel from source` exposes an editable
+HTTP/HTTPS URL. The most recent URL that downloaded and validated successfully
+is remembered separately for each client through the existing
+`ExternalDataFile.source_url` history. If no successful history exists, the
+form uses `FUEL_SOURCE_URL`.
+
+Product and Stock remain local reference-file uploads. Their original filenames
+and import history are retained, but browsers do not expose or allow Django to
+prefill the user's local directory.
 
 ## Cubic Margin
 

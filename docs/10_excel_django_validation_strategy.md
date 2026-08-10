@@ -85,6 +85,30 @@ They must come from the same generation run.
 
 Do not compare expected CSV files from one baseline against PostgreSQL data imported from another baseline.
 
+The baseline filename and SHA-256 should be retained with the fixture hashes in
+a manifest. Do not select a workbook merely because it is the newest file in
+`sample_data/live_baselines/`.
+
+For `live_latest`, the runbook writes:
+
+```text
+reports/sth_excel_live_latest_manifest.csv
+```
+
+## Database-isolation rule
+
+`validate_excel_battery --import-workbook --replace` invokes
+`import_sth_excel --replace`. It therefore rebuilds client calculation data and
+deletes non-Fuel `ExternalDataFile` records in the selected database. Batteries
+must run against a dedicated temporary PostgreSQL database, not the operational
+database used by the calculator.
+
+Use `--fail-on-difference` for release validation. Without it, the command can
+write `FAIL` rows to the CSV report but still return exit code zero.
+
+The exact PowerShell procedure is maintained in
+`docs/11_validation_runbook.md`.
+
 ## What a report row means
 
 `Report rows` is not the number of cases.

@@ -10,10 +10,13 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterable
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.validators import URLValidator
 from django.db import transaction
 from django.utils import timezone
 
@@ -23,6 +26,7 @@ from apps.imports.services.audit import create_audit_event
 
 
 REQUIRED_COLUMNS = ('master_rate', 'info', 'rate', 'updated', 'expires', 'warnings')
+REMEMBERED_SOURCE_STATUSES = ('VALIDATED', 'ACTIVE', 'ROLLED_BACK', 'ARCHIVED')
 
 
 class FuelImportError(Exception):
@@ -119,6 +123,38 @@ def calculate_sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def default_fuel_source_url() -> str:
+    return str(
+        getattr(settings, 'FUEL_SOURCE_URL', 'https://www.poscat.com.au/fuelsc/fuel.csv')
+    ).strip()
+
+
+def remembered_fuel_source_url(client) -> str:
+    """Return the last successfully validated fetch URL for one client."""
+    latest_url = (
+        ExternalDataFile.objects.filter(
+            client=client,
+            file_type='FUEL',
+            source_method='ADMIN_WEB_FETCH',
+            status__in=REMEMBERED_SOURCE_STATUSES,
+        )
+        .exclude(source_url='')
+        .order_by('-validated_at', '-uploaded_at')
+        .values_list('source_url', flat=True)
+        .first()
+    )
+    return latest_url or default_fuel_source_url()
+
+
+def validate_fuel_source_url(source_url: str) -> str:
+    source_url = str(source_url or '').strip()
+    try:
+        URLValidator(schemes=('http', 'https'))(source_url)
+    except ValidationError as exc:
+        raise FuelImportError('Enter a valid HTTP or HTTPS fuel source URL.') from exc
+    return source_url
+
+
 def download_source(url: str) -> tuple[bytes, str]:
     timeout = int(getattr(settings, 'FUEL_FETCH_TIMEOUT_SECONDS', 30))
     request = Request(
@@ -143,8 +179,8 @@ def download_source(url: str) -> tuple[bytes, str]:
     return content, content_type
 
 
-def create_downloaded_fuel_file(*, client, actor, notes='', request=None) -> ExternalDataFile:
-    source_url = getattr(settings, 'FUEL_SOURCE_URL', 'https://www.poscat.com.au/fuelsc/fuel.csv')
+def create_downloaded_fuel_file(*, client, actor, source_url='', notes='', request=None) -> ExternalDataFile:
+    source_url = validate_fuel_source_url(source_url or default_fuel_source_url())
     request_id = hashlib.sha256(f'{timezone.now().isoformat()}:{client.pk}'.encode()).hexdigest()[:32]
     create_audit_event(
         event_type='FUEL_FETCH_STARTED',
@@ -157,7 +193,7 @@ def create_downloaded_fuel_file(*, client, actor, notes='', request=None) -> Ext
     )
     try:
         content, content_type = download_source(source_url)
-        filename = Path(source_url).name or 'fuel.csv'
+        filename = Path(urlsplit(source_url).path).name or 'fuel.csv'
         external_file = ExternalDataFile(
             client=client,
             file_type='FUEL',

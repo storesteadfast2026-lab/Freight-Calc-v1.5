@@ -1,7 +1,7 @@
 # Prompt maestro para continuar el proyecto con IA
 
-**Estado:** CURRENT  
-**Revisión:** 2026-07-28 12:53 Australia/Adelaide  
+**Estado:** CURRENT
+**Revisión:** 2026-08-04 13:45 Australia/Adelaide
 **Uso:** Copiar el bloque completo de esta sección al iniciar una conversación nueva para continuar el proyecto.
 
 ## Objetivo del prompt
@@ -36,6 +36,9 @@ Los comandos operativos del repositorio completo usan:
 sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
 
 No asumas que un ZIP de revisión es ejecutable. Antes de proponer comandos de build o pruebas, verifica que incluya docker/django/Dockerfile, sample_data/, baselines, fixtures y reportes requeridos.
+
+Las ausencias registradas para el ZIP histórico del 28 de julio no representan
+automáticamente el estado del repositorio completo actual.
 
 ORDEN DE REVISIÓN OBLIGATORIO AL INICIAR UNA SESIÓN
 
@@ -112,6 +115,12 @@ sample_data/live_baselines/
 
 Usa siempre el baseline exacto que generó los CSV expected.
 
+Ejecuta baterías con --import-workbook --replace solamente en una base
+PostgreSQL aislada. Ese import reconstruye Product, Rates, Zones, carrier
+configuration y elimina registros ExternalDataFile que no sean Fuel, junto con
+las filas staging Product/Stock relacionadas. Usa el procedimiento de
+docs/11_validation_runbook.md y agrega --fail-on-difference.
+
 Evidencia del snapshot documental del 28 de julio de 2026:
 - manage.py check sin errores según el diagnóstico retenido;
 - migraciones incluidas registradas como aplicadas;
@@ -150,6 +159,11 @@ La importación operacional completa se realiza con import_sth_excel y puede car
 
 Product y Stock administrados como archivos externos son fuentes de referencia/staging y no deben cambiar tablas operacionales. Fuel cambia valores operacionales solamente después de una activación explícita.
 
+Fetch Fuel permite editar una URL HTTP/HTTPS y recuerda por cliente la última
+URL obtenida y validada exitosamente mediante ExternalDataFile.source_url. La
+activación continúa siendo explícita. Product y Stock permanecen como uploads
+locales y el navegador no permite recordar o precargar su directorio local.
+
 USUARIOS Y ACCESO
 
 La versión 1 está implementada en el código con auth.User y CalculatorUserProfile.
@@ -167,6 +181,19 @@ Administración:
 - Los permisos individuales no se administran en Users; se administran en Groups.
 
 No describas invitaciones por correo o password reset por email como finalizados: requieren SMTP y pruebas end-to-end.
+
+La regla de mensaje uniforme para todo rechazo de login está aceptada, pero su
+implementación sigue parcial: CalculatorAuthenticationForm existe y no está
+conectado a CalculatorLoginView. Cuatro tests de test_login_security permanecen
+abiertos. No afirmes que la protección completa está runtime verified.
+
+DISEÑO ACTUAL DE LA CALCULADORA
+
+- Layout responsive Route / Shipment / Available freight options con Shipment
+  summary a la derecha en desktop.
+- No incluye la franja Destination / Shipment / Compare rates.
+- El cambio visual conserva IDs, JavaScript, payload y /api/calculate/.
+- El usuario confirmó la instalación visual después de una corrida de 63 tests.
 
 ALCANCE NO IMPLEMENTADO O TODAVÍA ABIERTO
 

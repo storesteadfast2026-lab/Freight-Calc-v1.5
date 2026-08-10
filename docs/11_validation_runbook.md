@@ -15,6 +15,64 @@ Docker must be running:
 docker compose ps
 ```
 
+## Mandatory isolated PostgreSQL database
+
+Never execute an Excel battery with `--import-workbook --replace` against the
+operational database. The import deletes and rebuilds calculation data and
+removes non-Fuel Product/Stock import history for the selected client.
+
+Create a uniquely named validation database in the existing PostgreSQL
+container:
+
+```powershell
+$ValidationDb = "freight_validation_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
+
+docker compose exec -T db sh -lc `
+  'createdb --username="$POSTGRES_USER" "$1"' sh $ValidationDb
+
+docker compose run --rm --no-deps `
+  --env "POSTGRES_DB=$ValidationDb" `
+  web python manage.py migrate --noinput
+```
+
+Every battery command in this runbook uses `docker compose run` with that
+database. Do not replace it with `docker compose exec web`, because `exec web`
+uses the operational database configured for the running application.
+
+For the currently retained `live_latest_refresh` evidence, first verify the
+baseline path that exists in the full repository:
+
+```powershell
+$LiveBaselineRelative = `
+  "live_latest_refresh/STH_LIVE_BASELINE_20260714_152158.xlsx"
+$LiveBaselineHost = Join-Path `
+  ".\sample_data\live_baselines" `
+  $LiveBaselineRelative
+
+if (-not (Test-Path $LiveBaselineHost -PathType Leaf)) {
+    throw "Matching live_latest baseline not found: $LiveBaselineHost"
+}
+
+Get-FileHash $LiveBaselineHost -Algorithm SHA256
+
+$LiveEvidenceFiles = @(
+    $LiveBaselineHost,
+    ".\app\apps\freight\fixtures\live_latest\sth_excel_generated_cases.csv",
+    ".\app\apps\freight\fixtures\live_latest\sth_excel_generated_outputs.csv",
+    ".\app\apps\freight\fixtures\live_latest\sth_excel_generated_components.csv"
+)
+
+$LiveEvidenceFiles |
+    ForEach-Object { Get-FileHash $_ -Algorithm SHA256 } |
+    Select-Object Path, Hash |
+    Export-Csv `
+      ".\reports\sth_excel_live_latest_manifest.csv" `
+      -NoTypeInformation
+```
+
+The filename alone is not permanent proof of pairing. Preserve its SHA-256
+together with the three fixture hashes whenever the baseline is refreshed.
+
 ## Generate Excel expected outputs from the official workbook
 
 Example for a temporary real check:
@@ -49,7 +107,17 @@ $baselineName
 ## Validate Django against the generated Excel baseline
 
 ```powershell
-docker compose exec web python manage.py validate_excel_battery --import-workbook --workbook /app/sample_data/live_baselines/live_real_check/$baselineName --replace --cases /app/apps/freight/fixtures/live_real_check/sth_excel_generated_cases.csv --expected /app/apps/freight/fixtures/live_real_check/sth_excel_generated_outputs.csv --components /app/apps/freight/fixtures/live_real_check/sth_excel_generated_components.csv --report /app/reports/live_real_check/sth_excel_live_real_check_report.csv
+docker compose run --rm --no-deps `
+  --env "POSTGRES_DB=$ValidationDb" `
+  web python manage.py validate_excel_battery `
+  --import-workbook `
+  --workbook "/app/sample_data/live_baselines/live_real_check/$baselineName" `
+  --replace `
+  --cases /app/apps/freight/fixtures/live_real_check/sth_excel_generated_cases.csv `
+  --expected /app/apps/freight/fixtures/live_real_check/sth_excel_generated_outputs.csv `
+  --components /app/apps/freight/fixtures/live_real_check/sth_excel_generated_components.csv `
+  --report /app/reports/live_real_check/sth_excel_live_real_check_report.csv `
+  --fail-on-difference
 ```
 
 Summary:
@@ -105,17 +173,50 @@ $randomBaseline = Get-ChildItem .\generated_excel_baselines\random_current -Filt
 Copy-Item $randomBaseline.FullName .\sample_data\live_baselines\random_current\ -Force
 $randomBaselineName = $randomBaseline.Name
 
-docker compose exec web python manage.py validate_excel_battery `
+docker compose run --rm --no-deps `
+  --env "POSTGRES_DB=$ValidationDb" `
+  web python manage.py validate_excel_battery `
   --import-workbook `
   --workbook /app/sample_data/live_baselines/random_current/$randomBaselineName `
   --replace `
   --cases /app/apps/freight/fixtures/random_current/sth_excel_random_cases.csv `
   --expected /app/apps/freight/fixtures/random_current/sth_excel_random_outputs.csv `
   --components /app/apps/freight/fixtures/random_current/sth_excel_random_components.csv `
-  --report /app/reports/random_current/sth_excel_random_comparison_report.csv
+  --report /app/reports/random_current/sth_excel_random_comparison_report.csv `
+  --fail-on-difference
 ```
 
 After the command, confirm the four fixed CSV files and the matching baseline are present before recording the result in `docs/12_validation_findings_log.md`.
+
+## Run the retained live_latest battery safely
+
+```powershell
+docker compose run --rm --no-deps `
+  --env "POSTGRES_DB=$ValidationDb" `
+  web python manage.py validate_excel_battery `
+  --import-workbook `
+  --workbook "/app/sample_data/live_baselines/$LiveBaselineRelative" `
+  --replace `
+  --cases /app/apps/freight/fixtures/live_latest/sth_excel_generated_cases.csv `
+  --expected /app/apps/freight/fixtures/live_latest/sth_excel_generated_outputs.csv `
+  --components /app/apps/freight/fixtures/live_latest/sth_excel_generated_components.csv `
+  --report /app/reports/sth_excel_live_comparison_report.csv `
+  --fail-on-difference
+```
+
+Expected retained evidence is 97 OK and 0 FAIL. Record the actual output from
+the new run; do not infer success from the historical report.
+
+After completing the validation and retaining the report, remove only the
+uniquely named temporary database created above:
+
+```powershell
+docker compose exec -T db sh -lc `
+  'dropdb --username="$POSTGRES_USER" "$1"' sh $ValidationDb
+```
+
+This cleanup does not touch the operational PostgreSQL database or Docker
+volume.
 
 ## Important operational rule
 
@@ -136,9 +237,12 @@ Historical baselines must use the fuel cached in the same workbook that generate
 --fuel-source workbook
 ```
 
-After a normally completed validation, the command reapplies the active Admin fuel dataset.
+After a normally completed validation, the command reapplies the active Admin
+fuel dataset inside the validation database. When the isolated procedure is
+used, the operational Fuel configuration is never replaced.
 
-If the validation is interrupted, restore it manually:
+If an older battery was accidentally run against the operational database and
+was interrupted, restore Fuel manually:
 
 ```powershell
 docker compose exec web python manage.py reapply_active_fuel --client STH
@@ -166,6 +270,76 @@ Found 7 test(s)
 ```
 
 Record the actual `OK` result; do not infer it solely from source inspection. Then run the standard 0% Excel-vs-Django battery to confirm that default behavior remains unchanged.
+
+## Validate the calculator visual-only refresh
+
+Confirm that no schema change was introduced:
+
+```powershell
+docker compose exec web python manage.py check
+docker compose exec web python manage.py makemigrations --check --dry-run
+```
+
+Run the calculator DOM-contract, access and calculation regressions:
+
+```powershell
+docker compose exec web python manage.py test `
+  apps.freight `
+  apps.authentication_gateway.tests.test_login_flow `
+  --noinput `
+  -v 2
+```
+
+The visual-contract tests confirm that required IDs appear exactly once, the
+existing actions and `/api/calculate/` remain present, and no saved-shipment or
+staged progress control was introduced.
+
+Manual browser verification:
+
+1. Sign in as a Customer and as an Internal User.
+2. Confirm client selection visibility remains appropriate.
+3. Open suburb and product dropdowns without typing.
+4. Add and remove shipment rows; confirm Items, weight and cubic update.
+5. Enter Cubic Margin values 0, 10, 20 and an invalid value.
+6. Run a known calculation and compare carrier, service and estimate with the
+   pre-refresh result.
+7. Check desktop, tablet and mobile widths.
+8. Confirm the login page visual remains unchanged.
+
+## Validate remembered Fuel source URLs
+
+Run the Fuel import suite:
+
+```powershell
+docker compose exec web python manage.py test `
+  apps.imports.tests.test_fuel_import `
+  --noinput `
+  -v 2
+```
+
+The suite must confirm:
+
+- the configured fallback URL appears when no successful fetch exists;
+- an editable HTTP/HTTPS URL is passed to the downloader;
+- the selected URL is stored in `ExternalDataFile.source_url`;
+- the last successfully validated URL is restored for that client;
+- invalid non-HTTP/HTTPS input does not start a download;
+- validation, activation, rollback and active-Fuel reapplication remain unchanged.
+
+Confirm no schema change:
+
+```powershell
+docker compose exec web python manage.py makemigrations imports --check --dry-run
+```
+
+Manual check:
+
+1. Open `Imports → External data files → Fetch fuel from source`.
+2. Confirm the current client's remembered URL appears and is editable.
+3. Select another client and confirm the URL changes to that client's remembered value or fallback.
+4. Fetch and validate a trusted Fuel CSV.
+5. Reopen the Fetch page and confirm the validated URL is retained.
+6. Confirm activation is still a separate explicit action.
 
 ## Validate the three Django Admin source modules
 
@@ -206,7 +380,9 @@ Expected Product/Stock migration:
 docker compose exec web python manage.py test apps.imports.tests.test_fuel_import apps.imports.tests.test_product_stock_sources -v 2
 ```
 
-The current code contains 12 targeted import tests: 6 Fuel and 6 Product/Stock tests. Record the actual run result; do not claim success from test count alone.
+The current code contains 16 targeted import tests: 10 Fuel and 6
+Product/Stock tests. Record the actual run result; do not claim success from
+test count alone.
 
 ### Confirm operational isolation
 
@@ -245,7 +421,7 @@ When user code is authorized, validate in this order:
 
 ## User access deployment and validation — 2026-07-22
 
-Apply migrations and createte the minimum administrator group:
+Apply migrations and create the minimum administrator groups:
 
 ```powershell
 cd C:\Docker-Projects\Freight-Calc-Nuevo
@@ -289,9 +465,9 @@ OK
 ```
 
 The complete `apps.authentication_gateway` suite currently has four known
-baseline failures in `test_login_security`: the expected generic message does
-not match the current login form. They are not caused by group-based access and
-must be resolved as a separate login-security change.
+failures in `test_login_security`: the authored generic authentication form is
+not connected to the active `CalculatorLoginView`. They are not caused by
+group-based access and must be resolved as a separate login-security change.
 
 Create a local test Customer User:
 

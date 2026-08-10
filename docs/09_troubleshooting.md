@@ -65,10 +65,11 @@ The expected CSV files and PostgreSQL data are likely from different Excel basel
 
 Fix:
 
-Import and validate in the same command using the matching workbook:
+Import and validate in the same command using the matching workbook, but only
+inside an isolated PostgreSQL validation database:
 
 ```bash
-docker compose exec web python manage.py validate_excel_battery --import-workbook --workbook /app/sample_data/live_baselines/<matching-baseline>.xlsx --replace --cases <matching-cases.csv> --expected <matching-outputs.csv> --components <matching-components.csv> --report <report.csv>
+docker compose run --rm --no-deps --env "POSTGRES_DB=<ISOLATED_VALIDATION_DB>" web python manage.py validate_excel_battery --import-workbook --workbook /app/sample_data/live_baselines/<matching-baseline>.xlsx --replace --cases <matching-cases.csv> --expected <matching-outputs.csv> --components <matching-components.csv> --report <report.csv> --fail-on-difference
 ```
 
 Rule:
@@ -76,6 +77,11 @@ Rule:
 ```text
 expected CSVs and imported Excel baseline must be generated together
 ```
+
+Do not run this replacement command against the operational database. It
+rebuilds Product/Rate/Zone/Carrier configuration and removes non-Fuel
+`ExternalDataFile` history for the selected client. Follow the database
+creation and cleanup commands in `docs/11_validation_runbook.md`.
 
 ## TEAMTAS GENERAL extremely high value
 
@@ -111,6 +117,11 @@ live_latest 20 cases: 97 OK / 0 FAIL
 In the 2026-07-28 review package, only the `live_latest` result remains directly reproducible. The current `random_current` evidence set is incomplete; see `docs/12_validation_findings_log.md`.
 
 ## Fetch fuel from source fails
+
+Confirm that `Fuel source URL` contains a valid HTTP or HTTPS URL. The page
+prefills the last successfully validated URL for the selected client, falling
+back to `FUEL_SOURCE_URL` when no history exists. A failed download or failed
+validation does not replace the remembered URL.
 
 Check that the web container can access HTTPS and resolve DNS:
 
@@ -267,15 +278,32 @@ Then rebuild/restart the web service:
 docker compose up -d --build web
 ```
 
-## Calculator authentication appears enabled but the page is still public
+## Calculator unexpectedly appears public
 
-`CALCULATOR_REQUIRE_AUTH=1` currently affects only the middleware check for `/api/` paths. It does not protect `/` and does not authenticate a Django user.
+The current calculator page and APIs are protected by Django sessions and
+`CalculatorUserProfile`. `CALCULATOR_REQUIRE_AUTH` and `ExternalAuthMiddleware`
+are compatibility settings; they are not the active authorization boundary.
 
-Do not treat `ExternalAuthMiddleware` as complete login. Implement the session-based access plan in `docs/16_user_access_review_and_plan.md`.
+If `/` opens anonymously, confirm that the current image contains
+`calculator_access_required` on the calculator view and rebuild the web
+service. Run:
+
+```powershell
+docker compose exec web python manage.py test `
+  apps.authentication_gateway.tests.test_access `
+  apps.freight.tests.test_user_access `
+  -v 2
+```
 
 ## Staff user can access more Admin operations than expected
 
-Several custom import actions and read-only Admin views currently rely broadly on `is_staff`. Until explicit action/model permissions are added, grant `is_staff=True` only to fully trusted operational administrators.
+The current design requires membership in `Administrators`, an enabled
+Internal User / All clients profile and `is_staff=True`. Sensitive import
+actions also require their explicit permissions. A staff flag by itself must
+be rejected by `DjangoAdminAccessMiddleware`.
+
+Run `setup_access_roles` and inspect group permissions instead of assigning
+individual User permissions.
 
 ## User access troubleshooting — 2026-07-22
 
@@ -339,6 +367,47 @@ docker compose exec web python manage.py check
 
 Then use `Ctrl + Shift + R`. `Products > Products` must remain visible, while
 `Products > Product kit components` must not appear.
+
+### Calculator still shows the previous card layout
+
+The calculator refresh changes only its template and `app.css`. Rebuild the web
+image and force-refresh the browser:
+
+```powershell
+docker compose up -d --build web
+docker compose exec web python manage.py check
+```
+
+Then press:
+
+```text
+Ctrl + Shift + R
+```
+
+Confirm the page source loads `/static/css/app.css` and the body has
+`class="calculator-page"`. The refreshed layout must not show the staged
+`Destination / Shipment / Compare rates` progress strip.
+
+### Calculator looks correct but Calculate freight does nothing
+
+Do not rename or duplicate the visual-contract IDs. Confirm each appears once:
+
+```text
+from_address_id
+suburb_search
+state
+postcode
+tailgate
+preselect_sku
+cubic_margin_percent
+lines
+total_weight
+total_cubic
+results
+```
+
+Also confirm the gold button retains `onclick="calculate()"`. Revert visual
+markup changes before modifying calculation services.
 
 ### User cannot log in after command creation
 

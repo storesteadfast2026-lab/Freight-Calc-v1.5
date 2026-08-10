@@ -42,6 +42,10 @@ Before changing calculation logic:
 5. Run the relevant battery with the matching baseline.
 6. Update Markdown documentation.
 
+Run any battery that imports with `--replace` in an isolated PostgreSQL
+database and include `--fail-on-difference`. A report file alone is not proof
+that the command returned failure when mismatches existed.
+
 Before changing web-only behavior such as users/access:
 
 1. Update `business_rules/` with confirmed/proposed rules.

@@ -1,4 +1,5 @@
 from django import forms
+from django.core.validators import URLValidator
 
 from apps.clients.models import Client
 from apps.imports.models import ExternalDataFile
@@ -61,6 +62,13 @@ class SourceUploadForm(forms.Form):
 
 class FetchFuelForm(forms.Form):
     client = forms.ModelChoiceField(queryset=Client.objects.filter(active=True).order_by('code'))
+    source_url = forms.URLField(
+        label='Fuel source URL',
+        max_length=1000,
+        validators=[URLValidator(schemes=('http', 'https'))],
+        widget=forms.URLInput(attrs={'size': 100}),
+        help_text='The last validated URL for the selected client is remembered for future fetches.',
+    )
     notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={'rows': 3}),

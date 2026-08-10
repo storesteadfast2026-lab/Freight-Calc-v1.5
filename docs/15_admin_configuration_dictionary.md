@@ -1,17 +1,17 @@
 # Diccionario de configuración de Django Admin
 
-**Versión:** 0722.1350
+**Versión:** 0804.1345
 
 Este documento explica qué representa cada sección de administración, de dónde proviene y qué efecto tiene actualmente.
 
 | seccion_admin | modelo | proposito | campos_clave | origen_excel | efecto_actual | precaucion | trace_ids |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Clients > Clients | Client | Define el propietario lógico de datos y configuraciones. | code, name, active | No directo; el workbook corresponde a STH. | resolve_client exige active=True. | Desactivar STH impide calcular. | SYS-CLIENT-001 |
-| Clients > Freight calculators | FreightCalculator | Registra nombre, versión y engine key. | client, name, version, calculation_engine_key, active | Versión V2026.R2. | Sin selección activa del motor. | No asumir que active/engine key cambian el cálculo actual. | SYS-CALC-001 |
+| Oculto del Admin: FreightCalculator | FreightCalculator | Registra internamente nombre, versión y engine key. | client, name, version, calculation_engine_key, active | Versión V2026.R2. | Sin selección activa del motor y sin pantalla Admin. | No asumir que active/engine key cambian el cálculo actual. | SYS-CALC-001 |
 | Locations > From addresses | FromAddress | Dirección origen web por cliente. | client, name, suburb, state, postcode, is_default, active | Requisito web. | Se muestra en selector; no afecta cálculo. | is_default no selecciona automáticamente en la plantilla actual. | UI-FROM-001 |
 | Locations > Suburbs | Suburb | Maestro global de suburb/state/postcode. | suburb_name, state, postcode, normalized_key | SUBURBS. | Autocompletado y resolución de postcode. | No borrar coincidencias usadas por fixtures. | LOC-SUBURB-001, LOC-STATE-001, LOC-POST-001 |
 | Products > Products | Product | Maestro SKU por cliente. | sku, dimensions, weight_kg, cubic_m3, freight_type, active | SKUs. | Rellena líneas del formulario. | Cambios manuales se sobrescriben con --replace; confirmar cubic*quantity. | PROD-SKU-001, PROD-DIM-001, PROD-WGT-001, PROD-CUB-001, PROD-TYPE-001 |
-| Products > Product kit components | ProductKitComponent | Modelo inicial de compatibilidad para relaciones de kits. | parent_sku, component_sku, quantity | Concepto inicial asociado a SKU-Kits; comportamiento no confirmado. | Sin uso confirmado en cálculo, importaciones, vistas o servicios; oculto del Admin. | No borrar tabla ni datos hasta especificar y validar la lógica de kits contra Excel. | PROD-007 |
+| Oculto del Admin: ProductKitComponent | ProductKitComponent | Modelo inicial de compatibilidad para relaciones de kits. | parent_sku, component_sku, quantity | Concepto inicial asociado a SKU-Kits; comportamiento no confirmado. | Sin uso confirmado en cálculo, importaciones, vistas o servicios. | No borrar tabla ni datos hasta especificar y validar la lógica de kits contra Excel. | PROD-007 |
 | Carriers > Carriers | Carrier | Transportista principal. | code, name, active | FuelSurcharge/ZONES/RATES/SettingFlags. | Código visible y agrupación. | active no se consulta directamente por el motor. | CFG-CARRIER-001 |
 | Carriers > Carrier services | CarrierService | Servicio perteneciente a un carrier. | carrier, service_code, service_name, active | Service en FuelSurcharge/ZONES/RATES. | Forma excel_key y enlaza config/zona/tarifa. | No cambiar códigos sin reimportar relaciones; active no se consulta directamente. | CFG-SERVICE-001 |
 | Carriers > Client carrier configs | ClientCarrierConfig | Configura cómo un servicio opera para un cliente. | base_status, active, ratecard, fuel, fuel provenance, uprate, cubic conversion, flags P/C/tailgate/zone/handling | Principalmente FuelSurcharge G:AD; fuel operativo desde ExternalDataFile; handling amount en SettingFlags!E20. | Decide elegibilidad, zona, peso volumétrico y recargos. | Fuel levy source/updated/file son de solo lectura; el dataset Admin activo se reaplica tras imports normales. | CFG-CUSTOMER-001 a CFG-PCZONE-001, FUEL-PROV-001 |
@@ -38,7 +38,7 @@ Antes de cambiar un registro importado desde Excel:
 
 | Admin location | Control | Effect |
 |---|---|---|
-| Imports → External data files | Fetch fuel from source | Downloads and validates the configured official URL; does not activate rates |
+| Imports → External data files | Fetch fuel from source | Exposes an editable HTTP/HTTPS URL, remembers the last successfully validated URL per client, downloads and validates; does not activate rates |
 | Imports → External data files | Add external data file | Uploads a local `fuel.csv` snapshot |
 | External data file row | Validate | Builds ratecard preview and safety checks |
 | External data file row | Activate | Updates matching `ClientCarrierConfig.fuel_levy` values transactionally |
@@ -56,7 +56,17 @@ Antes de cambiar un registro importado desde Excel:
 | Product/Stock external file | View rows | Opens the read-only staging rows filtered by source file |
 | Product/Stock external file | Download | Downloads the stored source snapshot |
 
+Product and Stock retain client/type/file history, including the original
+filename. Their local filesystem directory is not available to Django and
+cannot be prefilled by the browser. Remote Product/Stock fetch remains a future
+feature and is not introduced by the remembered Fuel URL change.
+
 Product/Stock rows must never show `Activate` or `Rollback`.
+
+Important: `import_sth_excel --replace` is a separate full-workbook operation.
+In the selected database it deletes non-Fuel `ExternalDataFile` records and,
+by cascade, Product/Stock source rows. Run Excel validation batteries in an
+isolated database as documented in `docs/11_validation_runbook.md`.
 
 ## Minimum user and Django Admin implementation
 

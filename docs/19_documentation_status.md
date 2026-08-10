@@ -1,8 +1,8 @@
 # Documentation Status and Canonical Sources
 
-**Status:** CURRENT  
-**Reviewed:** 2026-07-28 12:53 Australia/Adelaide  
-**Scope:** `Create_Files_review_0728.0824.zip` and the separately supplied base workbook.
+**Status:** CURRENT after documentation audit
+**Reviewed:** 2026-08-04 13:45 Australia/Adelaide
+**Scope:** current documented source through the remembered Fuel URL change; historical review-package evidence is identified separately.
 
 ## Canonical sources
 
@@ -19,21 +19,33 @@
 
 Compatibility files under `docs/business rules/` and `docs/decisions/` are non-normative pointers.
 
-## Evidence confirmed in the supplied package
+## Evidence confirmed
 
-- The separately uploaded workbook and `reference_files/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx` have matching SHA-256 according to the completed review.
-- `manage.py check` completed with no issues.
-- The captured migration list shows all included migrations applied.
+- A historical review confirmed that the separately uploaded workbook and
+  `reference_files/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx` matched by
+  SHA-256.
+- Prior installers recorded `manage.py check` with no issues and migrations
+  applied.
 - `live_latest` includes 20 cases, 77 expected carrier rows, 20 component rows and a 97-row report with 97 OK / 0 FAIL.
-- The source contains implemented authentication, calculator-client authorization, integrated UserAdmin, import permissions and FreightCalculator Admin hiding.
+- The 2026-07-31 UI installer recorded 63 related tests passing and the user
+  confirmed the refreshed calculator visually.
+- Group/client authorization, integrated UserAdmin, import permissions,
+  ProductKitComponent hiding and FreightCalculator hiding are present in source
+  and covered by their retained targeted results.
 
-## Evidence not complete in the supplied package
+## Evidence incomplete or pending
 
-- The complete Django test run stopped while creating the test database.
-- `DATABASE_SUMMARY.txt` contains a malformed shell invocation and no row counts.
 - `random_current` contains only the cases file; outputs, components, matching baseline and report are absent.
-- The `live_latest` matching Excel baseline is not included under the expected `sample_data/live_baselines/` path.
-- The review ZIP does not contain `docker/django/Dockerfile`; it is not a standalone deployment package.
+- The full 72-test source suite is not passing: four of five
+  `test_login_security` tests remain open because the authored authentication
+  form is not wired into the active login view.
+- The remembered Fuel URL change is implemented in source, but its Docker
+  installer result has not been captured in this documentation snapshot.
+- The full repository contains several Excel baselines. The retained
+  `live_latest` evidence should record the exact baseline SHA-256 alongside the
+  three fixture hashes; filename and timestamp alone are insufficient.
+- Historical review ZIP omissions, including a missing Dockerfile, are not the
+  current repository state and are retained only as historical context.
 
 ## Open functional items — do not infer formulas
 
@@ -54,7 +66,9 @@ Compatibility files under `docs/business rules/` and `docs/decisions/` are non-n
 - converted duplicate historical files to pointers;
 - completed Product, Rate and Quotation scope documents without inventing formulas;
 - corrected obsolete authentication traceability rows;
-- resolved duplicate ADR, document and decision numbering;
+- established the intended unique ADR/document numbering, although two legacy
+  duplicate filenames remained and were converted to noncanonical pointers on
+  2026-08-04;
 - replaced the old project path with `C:\Docker-Projects\Freight-Calc-Nuevo`;
 - distinguished implemented source from runtime-verified evidence;
 - documented review-package limitations explicitly.
@@ -68,7 +82,8 @@ Compatibility files under `docs/business rules/` and `docs/decisions/` are non-n
 - Super User terminology: native account `super`; calculator profile optional.
 - Database schema: unchanged.
 - Runtime status: Django check, 28 affected access tests and 31 freight/import/client regressions passed in the review runtime; the installer repeats them in Docker.
-- Known baseline status: four unrelated `test_login_security` message assertions remain open and are documented in the validation log.
+- Known status: four `test_login_security` message assertions remain open and
+  are part of the login-security implementation, not an unrelated baseline.
 - Calculation status: unchanged; no freight or Excel files were modified.
 
 ## 2026-07-30 ProductKitComponent Admin visibility
@@ -78,3 +93,37 @@ Compatibility files under `docs/business rules/` and `docs/decisions/` are non-n
 - The compatibility model, migration, table, permissions and data remain intact.
 - No calculation, import, Excel or database-schema behavior changed.
 - Validation status: Django check, Product migration check and 21 targeted/regression tests passed in the review runtime.
+
+## 2026-07-31 calculator visual refresh
+
+- Responsive Route, Shipment, Shipment summary and freight-options layout implemented in source.
+- Staged `Destination / Shipment / Compare rates` navigation intentionally excluded.
+- Existing calculator DOM, JavaScript request and backend calculation contracts retained.
+- Two dedicated visual-contract tests added.
+- Validation status: Django check, migration check and 63 related regression tests passed in the review runtime.
+- Docker tests and browser confirmation were completed by the user after
+  installation.
+
+## 2026-08-03 remembered Fuel source URL
+
+- Fuel fetch URL is editable and validated as HTTP/HTTPS.
+- The latest successfully validated fetched URL is remembered separately for each client using existing `ExternalDataFile` history.
+- `FUEL_SOURCE_URL` remains the fallback for clients without successful fetched-Fuel history.
+- Product and Stock local-upload behavior is unchanged.
+- No model, migration, calculation, Excel, activation or rollback behavior changed.
+- Focused Fuel import tests and affected regressions are configured in the
+  installer; their actual Docker result must be captured after execution.
+
+## 2026-08-04 documentation safety correction
+
+- Excel batteries now require a uniquely named isolated PostgreSQL database.
+- Release commands include `--fail-on-difference`.
+- The destructive scope of `import_sth_excel --replace` is documented,
+  including deletion of non-Fuel Product/Stock import records and staging rows.
+- Obsolete public-calculator and broad-`is_staff` troubleshooting guidance was
+  replaced with the implemented session/group/permission model.
+- Traceability and Admin dictionary rows now describe hidden models and
+  server-authorized client selection correctly.
+- Import-test inventory is 10 Fuel plus 6 Product/Stock tests.
+- No application code, Excel file, fixture, report or database was changed by
+  this documentation correction.

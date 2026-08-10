@@ -46,15 +46,21 @@ Import the STH workbook only from the full project path:
 docker compose exec web python manage.py import_sth_excel /app/sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx --client STH --replace
 ```
 
-## Review-package limitation
+## Repository versus historical review packages
 
-The `Create_Files_review_0728.0824.zip` package is a review snapshot, not a guaranteed deployment package. It includes the workbook under `reference_files/`, while the operational commands expect `/app/sample_data/`. The extracted package also does not include `docker/django/Dockerfile` or populated baseline directories.
+`Create_Files_review_0728.0824.zip` was a historical review snapshot, not a
+deployment package. It placed the workbook under `reference_files/` and omitted
+the Django Dockerfile and populated baseline directories. Those omissions must
+not be attributed automatically to the current full repository.
 
 Therefore:
 
-- use the ZIP for code/documentation review;
+- use a historical review ZIP only for the evidence it actually contains;
 - use the complete project at `C:\Docker-Projects\Freight-Calc-Nuevo` for builds and test execution;
-- do not infer that Docker is broken solely because the review ZIP omits runtime files.
+- confirm the current repository contains `docker/django/Dockerfile`,
+  `sample_data/`, fixtures, baselines and reports before running commands;
+- do not infer that Docker is broken solely because an old review ZIP omitted
+  runtime files.
 
 ## Safe diagnostics
 

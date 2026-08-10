@@ -1,6 +1,6 @@
 # ADR 0005 — User Identity and Access Model for Version 1
 
-- **Status:** Accepted and implemented.
+- **Status:** Accepted and implemented; group terminology amended by ADR 0010.
 - **Date:** 2026-07-22.
 
 ## Context
@@ -18,9 +18,9 @@ The project already contains migrations and foreign keys referencing `settings.A
 5. Use `SINGLE_CLIENT`, `SELECTED_CLIENTS` and `ALL_CLIENTS` scopes as defined by role.
 6. Protect calculator page and APIs with Django sessions.
 7. Resolve the effective client in backend services; never trust unrestricted browser `client_code`.
-8. Use one `Django Administrator` group for normal administration.
+8. Historical decision: use one `Django Administrator` group for normal administration. ADR 0010 replaces this name and expands the protected group mapping.
 9. Require normal administrators to be Internal User / All clients.
-10. Keep User, Group, Permission and superuser administration exclusive to Technical Superusers.
+10. Keep User, Group, Permission and superuser administration exclusive to the native Super User; the designated account is `super`.
 11. Protect import validation, Fuel activation, Fuel rollback and download through custom permissions.
 12. Defer quotation permissions until quotation persistence exists.
 
@@ -51,7 +51,7 @@ custom ExternalDataFile permissions
 ### Negative
 
 - Built-in `User.email` is not unique; Version 1 uniqueness relies on `username=email` for users created through the command.
-- Calculator user administration remains Technical-Superuser-controlled.
+- Calculator user administration remains native-Super-User-controlled.
 - Invitation email remains pending.
 
 ## Verification requirement

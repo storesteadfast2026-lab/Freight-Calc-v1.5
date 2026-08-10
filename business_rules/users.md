@@ -1,7 +1,7 @@
 # Business Rules — Users and Access
 
-**Status:** CONFIRMED and implemented for Version 1  
-**Last review:** 2026-07-28  
+**Status:** CONFIRMED for access control; USR-010 remains PARTIAL
+**Last review:** 2026-08-04
 **Scope:** Freight calculator and Django Admin access.
 
 ## USR-001 — Calculator roles
@@ -98,6 +98,12 @@ Quotation draft, finalization, PDF, email and ownership rules remain `PENDING` b
 ## USR-010 — Generic login rejection
 
 All rejected calculator login attempts must return the same visible message, regardless of whether the username exists, the password is valid, the user is active or a calculator profile exists. Internal logs may record the specific reason. A rejected attempt must not create an authenticated session.
+
+**Implementation status:** `PARTIAL / KNOWN DEFECT`. The rule is accepted, but
+the active `CalculatorLoginView` does not currently use the authored
+`CalculatorAuthenticationForm`. Four rejection tests in
+`test_login_security` remain open. This status must not be changed to
+implemented until those tests pass in Docker.
 
 
 

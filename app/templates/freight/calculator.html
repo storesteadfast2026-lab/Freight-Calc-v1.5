@@ -6,111 +6,213 @@
   <title>{{ client.code }} Freight Calculator</title>
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
-<body>
-<main class="page">
-  <section class="card user-access-card">
-    <div class="user-access-summary">
-      <div>
-        <strong>{{ request.user.email|default:request.user.username }}</strong>
-        <span class="muted">{{ user_role_label }}</span>
+<body class="calculator-page">
+<header class="fc-header">
+  <div class="fc-header-inner">
+    <div class="fc-brand">
+      <strong>Freight Calculator</strong>
+      <span>Compare carrier rates in seconds</span>
+    </div>
+    <div class="fc-account">
+      <div class="fc-user">
+        <span class="fc-user-icon" aria-hidden="true">●</span>
+        <span>
+          <strong>{{ request.user.email|default:request.user.username }}</strong>
+          <small>{{ user_role_label }}</small>
+        </span>
       </div>
-      <div class="user-access-actions">
-        {% if can_select_client %}
-          <label>Client
-            <select id="active_client" onchange="changeActiveClient(this.value)">
-              {% for available_client in allowed_clients %}
-                <option value="{{ available_client.code }}" {% if available_client.id == client.id %}selected{% endif %}>
-                  {{ available_client.code }} — {{ available_client.name }}
-                </option>
-              {% endfor %}
-            </select>
+      {% if can_select_client %}
+        <label class="fc-client-select">
+          <span class="visually-hidden">Client</span>
+          <select id="active_client" onchange="changeActiveClient(this.value)">
+            {% for available_client in allowed_clients %}
+              <option value="{{ available_client.code }}" {% if available_client.id == client.id %}selected{% endif %}>
+                {{ available_client.code }} — {{ available_client.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+      {% else %}
+        <span class="fc-client-badge">{{ client.code }} — {{ client.name }}</span>
+      {% endif %}
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="fc-signout">Sign out</button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<main class="fc-page">
+  <div class="fc-workspace">
+    <div class="fc-main-column">
+      <section class="card route-card">
+        <h1>Route</h1>
+        <div class="route-primary-grid">
+          <div class="route-field route-from">
+            <span class="route-marker route-marker-from" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M12 22s7-7.1 7-13A7 7 0 1 0 5 9c0 5.9 7 13 7 13Zm0-9.5A3.5 3.5 0 1 1 12 5a3.5 3.5 0 0 1 0 7.5Z"/></svg>
+            </span>
+            <label>
+              <span class="field-label">From Address</span>
+              <select id="from_address_id">
+                <option value="">Default / Not selected</option>
+                {% for addr in from_addresses %}
+                  <option value="{{ addr.id }}" {% if addr.is_default %}selected{% endif %}>
+                    {{ addr.name }} - {{ addr.address_line_1 }}, {{ addr.suburb }} {{ addr.state }} {{ addr.postcode }}
+                  </option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+
+          <div class="route-connector" aria-hidden="true">
+            <span></span>
+          </div>
+
+          <div class="route-field route-to">
+            <span class="route-marker route-marker-to" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M12 22s7-7.1 7-13A7 7 0 1 0 5 9c0 5.9 7 13 7 13Zm0-9.5A3.5 3.5 0 1 1 12 5a3.5 3.5 0 0 1 0 7.5Z"/></svg>
+            </span>
+            <label>
+              <span class="field-label">To Suburb</span>
+              <div class="combo-field">
+                <input id="suburb_search" placeholder="Select or type suburb" autocomplete="off" onfocus="showSuburbOptions(true)">
+                <button type="button" class="combo-toggle" aria-label="Show suburbs" onclick="showSuburbOptions(true)">⌄</button>
+                <div id="suburb_results" class="dropdown"></div>
+              </div>
+            </label>
+          </div>
+
+          <label class="route-compact-field">
+            <span class="field-label">State</span>
+            <input id="state" readonly>
           </label>
-        {% else %}
-          <span class="client-badge">{{ client.code }} — {{ client.name }}</span>
-        {% endif %}
-        <form method="post" action="{% url 'logout' %}">
-          {% csrf_token %}
-          <button type="submit">Sign out</button>
-        </form>
-      </div>
-    </div>
-  </section>
-
-  <section class="card calculator-card">
-    <div class="calculator-header">
-      <h1>Freight Calculator</h1>
-      <p class="muted">{{ client.code }} / Steadfast Freight Calculator</p>
-    </div>
-    <div class="grid calculator-grid">
-      <label>From Address
-
-        <select id="from_address_id">
-          <option value="">Default / Not selected</option>
-
-          {% for addr in from_addresses %}
-            <option value="{{ addr.id }}" {% if addr.is_default %}selected{% endif %}>
-              {{ addr.name }} - {{ addr.address_line_1 }}, {{ addr.suburb }} {{ addr.state }} {{ addr.postcode }}
-            </option>
-          {% endfor %}
-        </select>
-
-      </label>
-      <label>To Suburb
-        <div class="combo-field">
-          <input id="suburb_search" placeholder="Select or type suburb" autocomplete="off" onfocus="showSuburbOptions(true)">
-          <button type="button" class="combo-toggle" aria-label="Show suburbs" onclick="showSuburbOptions(true)">⌄</button>
-          <div id="suburb_results" class="dropdown"></div>
+          <label class="route-compact-field">
+            <span class="field-label">Postcode</span>
+            <input id="postcode" readonly>
+          </label>
         </div>
-      </label>
-      <label>State <input id="state" readonly></label>
-      <label>Postcode <input id="postcode" readonly></label>
-      <label>Tailgate
-        <select id="tailgate"><option>NO</option><option>YES</option></select>
-      </label>
-      <label>Use Preselected SKU Mode
-        <select id="preselect_sku"><option>YES</option><option>NO</option></select>
-      </label>
-      <label>Cubic Margin (%) *
-        <input id="cubic_margin_percent" type="number" min="0" max="20" step="1" placeholder="0–20" inputmode="numeric" aria-label="Cubic Margin percentage">
-      </label>
-    </div>
-  </section>
 
-  <section class="card products-card">
-    <div class="products-table-wrap">
-    <table id="lines" class="products-table">
-      <thead><tr><th class="col-product">Product</th><th class="col-qty">Qty</th><th class="col-type">Type</th><th class="col-num">L</th><th class="col-num">W</th><th class="col-num">H</th><th class="col-num">Weight</th><th class="col-num">Cubic</th><th class="col-action"></th></tr></thead>
-      <tbody></tbody>
-      <tfoot>
-        <tr>
-          <td colspan="6" style="text-align: right;"><strong>TOTAL</strong></td>
-          <td style="text-align: right;"><input id="total_weight" class="decimal" value="0.00" readonly aria-label="Total Weight" style="text-align: right;"></td>
-          <td style="text-align: right;"><input id="total_cubic" class="decimal" value="0.000" readonly aria-label="Total Cubic" style="text-align: right;"></td>
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
-    </div>
-    <button onclick="addLine()">Add line</button>
-    <button class="primary" onclick="calculate()">Calculate Freight</button>
-  </section>
+        <div class="route-options-grid">
+          <label>
+            <span class="field-label">Tailgate <span class="field-help" title="Tailgate delivery requirement">i</span></span>
+            <select id="tailgate"><option>NO</option><option>YES</option></select>
+          </label>
+          <label>
+            <span class="field-label">Use Preselected SKU Mode <span class="field-help" title="Use the saved product master">i</span></span>
+            <select id="preselect_sku"><option>YES</option><option>NO</option></select>
+          </label>
+          <label>
+            <span class="field-label">Cubic Margin (%) <span class="field-help" title="Optional whole number from 0 to 20">i</span></span>
+            <input id="cubic_margin_percent" type="number" min="0" max="20" step="1" placeholder="0–20" inputmode="numeric" aria-label="Cubic Margin percentage">
+          </label>
+        </div>
+      </section>
 
-  <section class="card">
-    <h2>Results</h2>
-    <div id="calc_status" class="status"></div>
-    <div id="error" class="error"></div>
-    <table id="results"><thead><tr><th>Carrier</th><th>Service</th><th>Freight Estimate ex GST</th></tr></thead><tbody></tbody></table>
-    <div class="pricing-note">
-    Please note: Final pricing may vary due to applicable fuel surcharges.
-    The calculated cubic volume may also increase when multiple items are packed together.
+      <section class="card products-card shipment-card">
+        <div class="section-heading">
+          <h2>Shipment</h2>
+          <p>Enter your freight items and dimensions.</p>
+        </div>
+        <div class="products-table-wrap">
+          <table id="lines" class="products-table">
+            <thead>
+              <tr>
+                <th class="col-product">Product</th>
+                <th class="col-qty">Qty</th>
+                <th class="col-type">Type</th>
+                <th class="col-num">L (m)</th>
+                <th class="col-num">W (m)</th>
+                <th class="col-num">H (m)</th>
+                <th class="col-num">Weight (kg)</th>
+                <th class="col-num">Cubic (m³)</th>
+                <th class="col-action">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <button type="button" class="add-line-button" onclick="addLine()">
+          <span aria-hidden="true">＋</span> Add freight item
+        </button>
+      </section>
+
+      <section class="card results-card">
+        <div class="section-heading results-heading">
+          <div>
+            <h2>Available freight options</h2>
+            <p>Carrier estimates for your shipment.</p>
+          </div>
+        </div>
+        <div id="calc_status" class="status" aria-live="polite"></div>
+        <div id="error" class="error" role="alert"></div>
+        <table id="results" class="results-table">
+          <thead class="visually-hidden">
+            <tr><th>Carrier</th><th>Service</th><th>Freight Estimate ex GST</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="results-note">
+          <span class="info-icon" aria-hidden="true">i</span>
+          <p>
+            Final pricing may vary due to applicable fuel surcharges. Cubic volume may increase
+            when multiple items are packed together. Cubic Margin can account for additional
+            packing volume. Freight Calculator preliminary version — v0.1.
+          </p>
+        </div>
+      </section>
     </div>
-    <div class="pricing-note">
-    * Cubic Margin increases the visible product cubic volume before freight rates are calculated.
-    </div>
-     <div class="pricing-note">
-    ** Freight Calculator preliminary version - v0.1
-    </div>
-  </section>
+
+    <aside class="card shipment-summary" aria-labelledby="shipment-summary-title">
+      <h2 id="shipment-summary-title">Shipment summary</h2>
+
+      <div class="summary-row">
+        <span class="summary-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 2.3L5.3 8 12 11.7 18.7 8 12 4.3ZM5 9.8v6l6 3.3v-6L5 9.8Zm8 9.3 6-3.3v-6l-6 3.3v6Z"/></svg>
+        </span>
+        <span>
+          <strong>Items</strong>
+          <output id="item_count">0 items</output>
+        </span>
+      </div>
+
+      <div class="summary-row">
+        <span class="summary-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false"><path d="M8 6a4 4 0 1 1 8 0h2.2L21 22H3L5.8 6H8Zm2 0h4a2 2 0 1 0-4 0Zm-2.5 2L5.4 20h13.2L16.5 8h-9Z"/></svg>
+        </span>
+        <label>
+          <span>Total weight</span>
+          <span class="summary-value-wrap">
+            <input id="total_weight" class="summary-value decimal" value="0.00" readonly aria-label="Total Weight">
+            <span>kg</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="summary-row">
+        <span class="summary-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 2.3L5.3 8 12 11.7 18.7 8 12 4.3ZM5 9.8v6l6 3.3v-6L5 9.8Zm8 9.3 6-3.3v-6l-6 3.3v6Z"/></svg>
+        </span>
+        <label>
+          <span>Total cubic</span>
+          <span class="summary-value-wrap">
+            <input id="total_cubic" class="summary-value decimal" value="0.000" readonly aria-label="Total Cubic">
+            <span>m³</span>
+          </span>
+        </label>
+      </div>
+
+      <button type="button" class="primary calculate-button" onclick="calculate()">
+        Calculate freight
+      </button>
+
+      <div class="summary-notice">
+        <span class="info-icon" aria-hidden="true">i</span>
+        <span>Rates are estimates only and exclude GST.</span>
+      </div>
+    </aside>
+  </div>
 </main>
 <script>
 const CURRENT_CLIENT_CODE = '{{ client.code|escapejs }}';
@@ -138,6 +240,7 @@ function parseNumber(value){
 }
 function updateProductTotals(){
   const rows=[...document.querySelectorAll('#lines tbody tr')];
+  const itemCount=document.getElementById('item_count');
   let productWeight=0;
   let productCubic=0;
   let palletCount=0;
@@ -168,12 +271,13 @@ function updateProductTotals(){
   const adjustedProductCubic = productCubic * (1 + (marginPercent / 100));
   const totalCubic = Math.ceil((adjustedProductCubic - Number.EPSILON) * 1000) / 1000;
 
+  itemCount.textContent=`${rows.length} item${rows.length === 1 ? '' : 's'}`;
   document.getElementById('total_weight').value = formatNumber(totalWeight);
   document.getElementById('total_cubic').value = formatNumber(totalCubic, 3);
 }
 function addLine(){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false);updateProductTotals()" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.000"></td><td><button onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
+  tr.innerHTML=`<td><div class="combo-field product-combo"><input class="sku" placeholder="Select or type SKU" oninput="productSearch(this,false);updateProductTotals()" onfocus="productSearch(this,true)"><button type="button" class="combo-toggle" aria-label="Show products" onclick="productSearch(this.parentElement.querySelector('.sku'),true)">⌄</button><div class="dropdown product_dd"></div></div></td><td><input class="qty" value="1" type="number" min="0"></td><td><input class="ftype" value="P"></td><td><input class="len decimal" value="0.00"></td><td><input class="wid decimal" value="0.00"></td><td><input class="hei decimal" value="0.00"></td><td><input class="weight decimal" value="0.00"></td><td><input class="cubic decimal" value="0.000"></td><td><button type="button" class="remove-line" aria-label="Remove freight item" title="Remove freight item" onclick="this.closest('tr').remove();updateProductTotals();">Remove</button></td>`;
   document.querySelector('#lines tbody').appendChild(tr);
   tr.querySelectorAll('.decimal').forEach(input =>
     input.addEventListener('blur', () => {

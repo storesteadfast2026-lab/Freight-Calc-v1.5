@@ -109,13 +109,13 @@ docker compose exec -it web python manage.py createsuperuser --username super
 
 Email invitation/password setup is not yet implemented end to end. SMTP settings and token-delivery tests are required before enabling invitations.
 
-## 8. Login and access messages — 2026-07-24
+## 8. Login and access messages — reviewed 2026-08-04
 
 All front-end authentication feedback is rendered inside `registration/login.html`.
 
 Confirmed behavior:
 
-- invalid username/password uses one generic credential message;
+- invalid username/password uses the template's generic credential message;
 - valid credentials without calculator entitlement do not create a login session;
 - an old authenticated session without a calculator profile is cleared and redirected to login;
 - the browser never receives the internal text `This user does not have a calculator access profile.` as a plain page;
@@ -130,6 +130,12 @@ Your account does not have access to the Freight Calculator.
 ```
 
 Detailed entitlement reasons remain internal to the authorization service and are not exposed on the public login screen.
+
+Known defect: the accepted rule requires credential and entitlement rejections
+to use one identical visible message. `CalculatorAuthenticationForm` implements
+that combined message but `CalculatorLoginView` does not currently select the
+custom form. Four `test_login_security` rejection assertions remain open.
+Treat uniform user-enumeration protection as partial until those tests pass.
 
 ## 9. Approved login visual baseline — 2026-07-24
 
