@@ -30,7 +30,7 @@ Remove `ProductKitComponent` from Django Admin registration while retaining:
 - Its former Admin URL is no longer registered.
 - No migration or data deletion occurs.
 - Freight calculation, product import and Excel validation are unchanged.
-- Registration can be restored after kit behavior is specified and proven
+- Registration can be restored after kit behaviour is specified and proven
   against the workbook.
 
 ## Verification

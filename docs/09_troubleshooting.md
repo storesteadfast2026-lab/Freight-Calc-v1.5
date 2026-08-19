@@ -114,7 +114,34 @@ random_current 15 cases: 36 OK / 0 FAIL
 live_latest 20 cases: 97 OK / 0 FAIL
 ```
 
-In the 2026-07-28 review package, only the `live_latest` result remains directly reproducible. The current `random_current` evidence set is incomplete; see `docs/12_validation_findings_log.md`.
+In the 2026-08-18 review package, the `live_latest` fixtures and passing report
+are retained, but the matching Excel baseline and SHA-256 manifest are absent;
+the full run is therefore not reproducible from that ZIP alone. The current
+`random_current` evidence set is also incomplete. See
+`docs/12_validation_findings_log.md`.
+
+Do not reopen the original TEAMTAS defect merely because the directed case is
+missing from the current package. The code branch exists. First regenerate the
+same Excel case and compare it before deciding whether there is a new mismatch.
+
+## Complete test capture stops at test-database creation
+
+`TEST_RESULTS.txt` from 2026-08-18 contains only:
+
+```text
+FAILED TO EXECUTE: Creating test database for alias 'default' ('test_freight_platform')...
+```
+
+This does not identify the PostgreSQL cause and does not prove that application
+tests ran. Capture the complete combined output from the full repository:
+
+```powershell
+docker compose exec -T web python manage.py test -v 2 2>&1 |
+  Tee-Object -FilePath ".\TEST_RESULTS_FULL_$(Get-Date -Format 'MMdd.HHmm').txt"
+```
+
+Review the lines after database creation before changing test settings,
+credentials or PostgreSQL permissions.
 
 ## Fetch fuel from source fails
 
@@ -237,7 +264,7 @@ OK
 
 This is a comparison result, not an automatic import failure.
 
-`product_sth.xlsx` and `stock_sth.xlsx` are reference-only sources. Validation compares their normalized SKUs with the operational `Product` table but does not create or modify Products.
+`product_sth.xlsx` and `stock_sth.xlsx` are reference-only sources. Validation compares their normalised SKUs with the operational `Product` table but does not create or modify Products.
 
 Confirm the validation summary contains:
 
@@ -282,7 +309,7 @@ docker compose up -d --build web
 
 The current calculator page and APIs are protected by Django sessions and
 `CalculatorUserProfile`. `CALCULATOR_REQUIRE_AUTH` and `ExternalAuthMiddleware`
-are compatibility settings; they are not the active authorization boundary.
+are compatibility settings; they are not the active authorisation boundary.
 
 If `/` opens anonymously, confirm that the current image contains
 `calculator_access_required` on the calculator view and rebuild the web
@@ -426,7 +453,7 @@ An existing Django account successfully authenticated but had no enabled `Calcul
 ### Resolution — 2026-07-24
 
 - `CalculatorLoginView` checks calculator entitlement before creating the session.
-- The calculator decorator clears old unauthorized sessions.
+- The calculator decorator clears old unauthorised sessions.
 - The user returns to the normal login card with a generic access message.
 - Internal profile details are no longer shown as a plain browser response.
 
@@ -482,7 +509,7 @@ The approved source used `fadeInDown` on the complete wrapper and delayed `fadeI
 
 - `registration/login.html` again uses `login-wrapper fadeInDown`.
 - `static/css/login.css` contains the isolated approved animation.
-- The visual change does not alter login, CSRF, messages, user profiles or client authorization.
+- The visual change does not alter login, CSRF, messages, user profiles or client authorisation.
 - The incorrect mobile rule `width: 400%` from the old standalone CSS was not copied; the corrected width is responsive.
 
 After deployment rebuild the web image and force-refresh the browser:

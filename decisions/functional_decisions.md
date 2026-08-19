@@ -12,7 +12,7 @@
 ## DEC-002 — Calculator and Django Admin separation
 
 - **Status:** Accepted and implemented.
-- **Decision:** Django Admin is separate authorization. Customer Users cannot access it.
+- **Decision:** Django Admin is separate authorisation. Customer Users cannot access it.
 
 ## DEC-003 — Minimum Django Admin profiles
 
@@ -22,7 +22,7 @@
 ## DEC-004 — Existing Django user model
 
 - **Status:** Accepted and implemented.
-- **Decision:** Keep built-in `auth.User`; normalized email is stored in `username` and `email` for calculator users.
+- **Decision:** Keep built-in `auth.User`; normalised email is stored in `username` and `email` for calculator users.
 
 ## DEC-005 — Calculator access profile
 
@@ -71,8 +71,8 @@
 ## DEC-013 — Supplied login design is the visual baseline
 
 - **Status:** Accepted and implemented in source on 2026-07-24.
-- **Decision:** Preserve the supplied login behavior: the complete card uses `fadeInDown`, and logo/fields use the original delayed fade sequence.
-- **Boundary:** Visual changes must not replace the Django POST form, CSRF token, server-side messages, entitlement validation or client authorization.
+- **Decision:** Preserve the supplied login behaviour: the complete card uses `fadeInDown`, and logo/fields use the original delayed fade sequence.
+- **Boundary:** Visual changes must not replace the Django POST form, CSRF token, server-side messages, entitlement validation or client authorisation.
 
 ## DEC-014 — Integrated user administration
 
@@ -102,7 +102,7 @@
 
 - **Status:** Accepted and implemented in source on 2026-07-30.
 - **Decision:** Keep the `ProductKitComponent` model, table, migration and data, but remove its Django Admin registration while no current calculation, import, view or service uses it.
-- **Reversibility:** Restore Admin registration only after its operational purpose and workbook behavior are confirmed.
+- **Reversibility:** Restore Admin registration only after its operational purpose and workbook behaviour are confirmed.
 
 ## DEC-019 — Calculator presentation-only refresh
 

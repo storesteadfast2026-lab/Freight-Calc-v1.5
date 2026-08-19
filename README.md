@@ -1,80 +1,77 @@
 # STH Freight Platform
 
-Aplicación Django/PostgreSQL para migrar la lógica de la planilla `V2026.R2_Unlocked_STH_Freight_Calculator.xlsx` hacia una plataforma web multi-cliente.
+Django/PostgreSQL application for migrating the logic in `V2026.R2_Unlocked_STH_Freight_Calculator.xlsx` to a multi-client web platform.
 
-## Estado actual y evidencia
+## Current status and evidence
 
-El proyecto usa la planilla Excel como fuente de verdad funcional y compara los resultados calculados por Django contra expected outputs generados automáticamente desde Excel.
+**Documentation review:** 2026-08-19 08:10 Australia/Adelaide  
+**Code reviewed:** `main` branch, commit `6197775e57e2917c83b715e3991c342899977e95`
 
-Evidencia retenida para `live_latest`:
+The project uses the Excel workbook as the functional source of truth and compares results calculated by Django with expected outputs generated independently by Excel.
+
+Retained evidence for `live_latest`:
 
 ```text
-live_latest: 20 casos, 77 resultados + 20 componentes = 97 OK / 0 FAIL
+live_latest: 20 cases, 77 results + 20 components = 97 OK / 0 FAIL
 ```
 
-La documentación histórica registra una ejecución anterior de `random_current`
-con 15 casos y 36 OK. El conjunto `random_current` disponible en el snapshot
-documental revisado sigue incompleto: contiene 5 casos, pero no contiene sus
-outputs, componentes, baseline y reporte emparejados. Ese resultado histórico
-no debe presentarse como una ejecución actual reproducible.
+Historical documentation records an earlier `random_current` run with 15 cases and 36 OK rows. The set included in the 18 August 2026 package remains incomplete: it contains five cases but does not contain the paired outputs, components, baseline or report. The historical result must not be presented as a currently reproducible run.
 
-Último hito documentado:
+Latest state confirmed by the included code and evidence:
 
-- Corrección de lógica específica para `TEAMTAS GENERAL`.
-- Refresh de `live_latest` desde la planilla base actual.
-- Confirmación de que los CSV expected deben usarse siempre con el Excel baseline que los generó.
+- The dedicated `TEAMTAS GENERAL` branch is already implemented; it is not awaiting an initial fix.
+- The correction has historical evidence, but the targeted `WEEGENA / BRH4443 x 2` case is no longer retained in `random_current` with its baseline and report. Regenerate it before changing that branch again.
+- The retained canonical `live_latest` report contains 97 OK / 0 FAIL, but this ZIP does not include the paired baseline or SHA-256 manifest. The complete battery therefore cannot be reproduced from the package alone.
+- `DJANGO_CHECK.txt` confirms that `manage.py check` completed without errors, and `MIGRATIONS_STATUS.txt` records the applied migrations.
+- `TEST_RESULTS.txt` does not confirm the complete suite: capture stopped while creating `test_freight_platform`. `DATABASE_SUMMARY.txt` also lacks record counts because the packaged command was malformed.
 
-## Ejecutar con Docker en Windows
+## Run with Docker on Windows
 
 ```bash
 copy .env.example .env
 docker compose up --build
 ```
 
-Luego abrir:
+Then open:
 
 ```text
 http://localhost:8000/
 http://localhost:8000/admin/
 ```
 
-## Crear superusuario
+## Create a superuser
 
 ```bash
 docker compose exec web python manage.py createsuperuser
 ```
 
-## Importar el Excel de STH
+## Import the STH workbook
 
-La planilla base oficial para STH debe estar en:
+The official STH workbook must be located at:
 
 ```text
 sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
 ```
 
-Importación manual:
+Manual import:
 
 ```bash
 docker compose exec web python manage.py import_sth_excel /app/sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx --client STH --replace
 ```
 
-## Validación Excel vs Django
+## Excel-vs-Django validation
 
-Para validar una batería, usar siempre el Excel baseline que generó sus CSV expected.
+Always validate a battery with the Excel baseline that generated its expected CSV files.
 
-La importación con `--replace` reconstruye datos del cliente y elimina de la
-base seleccionada los registros Product/Stock de referencia que no sean Fuel.
-Por eso las baterías deben ejecutarse en una base PostgreSQL aislada, nunca en
-la base operativa diaria. Seguir el procedimiento seguro de
-`docs/11_validation_runbook.md`.
+An import using `--replace` rebuilds client data and deletes non-Fuel Product/Stock reference records from the selected database. Batteries must therefore run in an isolated PostgreSQL database, never in the daily operational database. Follow the safe procedure in `docs/11_validation_runbook.md`.
 
-Ejemplo `live_latest`:
+Example for `live_latest`:
 
 ```bash
 docker compose run --rm --no-deps --env "POSTGRES_DB=<ISOLATED_VALIDATION_DB>" web python manage.py validate_excel_battery --import-workbook --workbook /app/sample_data/live_baselines/<MATCHING_BASELINE>.xlsx --replace --cases /app/apps/freight/fixtures/live_latest/sth_excel_generated_cases.csv --expected /app/apps/freight/fixtures/live_latest/sth_excel_generated_outputs.csv --components /app/apps/freight/fixtures/live_latest/sth_excel_generated_components.csv --report /app/reports/sth_excel_live_comparison_report.csv --fail-on-difference
 ```
 
-Ver más en:
+See also:
 
 ```text
 docs/10_excel_django_validation_strategy.md
@@ -82,64 +79,61 @@ docs/11_validation_runbook.md
 docs/12_validation_findings_log.md
 ```
 
-## Documentación
+## Documentation
 
-Ver carpeta `docs/`.
+See the `docs/` directory.
 
-Documentos principales:
+Key documents:
 
-- `docs/02_calculation_flow.md`: flujo de cálculo y reglas especiales por carrier.
-- `docs/07_testing_strategy.md`: estrategia de pruebas.
-- `docs/10_excel_django_validation_strategy.md`: estrategia Excel vs Django.
-- `docs/11_validation_runbook.md`: comandos operativos.
-- `docs/12_validation_findings_log.md`: historial de bugs/hallazgos.
-- `docs/13_ai_spec_driven_workflow.md`: forma de trabajar con IA y spec-driven development.
-- `docs/14_excel_django_traceability_matrix.md`: matriz Excel ↔ Django.
-- `docs/15_admin_configuration_dictionary.md`: diccionario de Django Admin.
-- `docs/16_user_access_review_and_plan.md`: registro de implementación y pendientes de usuarios/accesos.
-- `docs/17_user_admin_runbook.md`: operación de usuarios desde Django Admin.
-- `docs/18_login_security_and_ui.md`: seguridad y diseño del login.
-- `docs/19_documentation_status.md`: mapa canónico, evidencia incluida y pendientes reales.
-- `docs/20_ai_project_continuation_prompt.md`: prompt maestro actualizado para retomar el proyecto con IA.
-- `business_rules/`: reglas funcionales aprobadas o propuestas.
-- `decisions/`: registro de decisiones funcionales.
-- `docs/adr/`: decisiones técnicas permanentes.
+- `docs/02_calculation_flow.md`: calculation flow and carrier-specific rules.
+- `docs/07_testing_strategy.md`: testing strategy.
+- `docs/10_excel_django_validation_strategy.md`: Excel-vs-Django strategy.
+- `docs/11_validation_runbook.md`: operational commands.
+- `docs/12_validation_findings_log.md`: defect and finding history.
+- `docs/13_ai_spec_driven_workflow.md`: AI-assisted, specification-driven workflow.
+- `docs/14_excel_django_traceability_matrix.md`: Excel-to-Django traceability matrix.
+- `docs/15_admin_configuration_dictionary.md`: Django Admin configuration dictionary.
+- `docs/16_user_access_review_and_plan.md`: user/access implementation record and outstanding items.
+- `docs/17_user_admin_runbook.md`: user administration through Django Admin.
+- `docs/18_login_security_and_ui.md`: login security and design.
+- `docs/19_documentation_status.md`: canonical map, included evidence and current outstanding items.
+- `docs/20_ai_project_continuation_prompt.md`: updated master prompt for continuing the project with AI. This is the only project document intentionally maintained in Spanish.
+- `docs/22_language_policy.md`: Australian English standard and the Spanish prompt exception.
+- `business_rules/`: approved or proposed functional rules.
+- `decisions/`: functional decision record.
+- `docs/adr/`: permanent technical decisions.
 
+## Prompt for continuing the project with AI
 
-## Prompt para continuar el proyecto con IA
-
-Para iniciar una conversación nueva sin depender del historial del chat, usar el prompt canónico:
+To begin a new conversation without relying on chat history, use the canonical prompt:
 
 ```text
 docs/20_ai_project_continuation_prompt.md
 ```
 
-El prompt obliga a revisar primero la evidencia del repositorio, distingue estados de implementación y validación, conserva las rutas fijas de las baterías y evita convertir pendientes en reglas confirmadas.
+The prompt is intentionally written in Spanish. It requires the next session to review repository evidence first, distinguishes implementation and validation states, preserves fixed battery paths and prevents outstanding items from being treated as confirmed rules.
 
-## Proyecto completo y snapshots de revisión
+All other project documentation, application text, comments and docstrings use Australian English. See `docs/22_language_policy.md`.
 
-Los ZIP históricos de revisión no reemplazan el repositorio completo. En esos
-snapshots, la copia controlada del Excel puede estar en:
+## Complete project and review snapshots
+
+Review ZIP files do not replace the complete repository. In the package generated on 18 August 2026, the controlled workbook copy is located at:
 
 ```text
 reference_files/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
 ```
 
-Los comandos operativos continúan usando la ruta del proyecto completo:
+Operational commands continue to use the full-project path:
 
 ```text
 sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx
 ```
 
-Antes de usar un ZIP como entorno ejecutable, confirmar que incluya
-`docker/django/Dockerfile`, `sample_data/`, fixtures, baselines y reportes. El
-repositorio completo de trabajo está en
-`C:\Docker-Projects\Freight-Calc-Nuevo`; las ausencias de un snapshot antiguo
-no describen necesariamente el estado del repositorio actual.
+The reviewed package does not include `docker/django/Dockerfile`, the populated operational `sample_data/` directory, the required baselines or the `live_latest` manifest. It supports code review and inspection of retained evidence, not a complete build or validation run. The executable repository remains at `C:\Docker-Projects\Freight-Calc-Nuevo`.
 
-## Autoridad documental
+## Documentation authority
 
-Las fuentes normativas son:
+The normative sources are:
 
 ```text
 business_rules/*.md
@@ -147,58 +141,54 @@ decisions/functional_decisions.md
 docs/adr/*.md
 ```
 
-Las rutas antiguas bajo `docs/business rules/` y `docs/decisions/` son punteros de compatibilidad y no contienen reglas independientes.
+Legacy paths under `docs/business rules/` and `docs/decisions/` are compatibility pointers and do not contain independent rules.
 
-## Fuentes externas administradas por Django
+## External sources managed by Django
 
-Django Admin maneja actualmente tres archivos externos:
+Django Admin currently manages three external files:
 
 ```text
-product_sth.xlsx → referencia/staging, no cambia datos operativos
-stock_sth.xlsx   → referencia/staging, no cambia datos operativos
-fuel.csv         → cambia fuel solo después de Activate
+product_sth.xlsx -> reference/staging; does not change operational data
+stock_sth.xlsx   -> reference/staging; does not change operational data
+fuel.csv         -> changes fuel only after Activate
 ```
 
-La planilla completa `V2026.R2_Unlocked_STH_Freight_Calculator.xlsx` continúa siendo un import separado mediante `import_sth_excel` y la fuente funcional para validación Excel vs Django.
+The complete `V2026.R2_Unlocked_STH_Freight_Calculator.xlsx` workbook remains a separate import through `import_sth_excel` and the functional source for Excel-vs-Django validation.
 
-Ver:
+See:
 
 ```text
 docs/04_imports.md
 docs/15_admin_configuration_dictionary.md
 ```
 
-## Usuarios y acceso — Version 1
+## Users and access - Version 1
 
-La calculadora ahora requiere sesión Django y usa dos roles:
-
-```text
-Customer User → un solo cliente
-Internal User → todos los clientes o clientes seleccionados
-```
-
-El cliente se valida en el backend para la página, productos y cálculo. Un `client_code` modificado en el navegador no permite acceder a otro cliente.
-
-La autorización y el aislamiento de clientes tienen pruebas aprobadas. La
-uniformidad completa del mensaje de rechazo de login permanece abierta: cuatro
-tests de `test_login_security` documentan la diferencia entre el formulario
-genérico esperado y la vista de login activa. No considerar cerrada esa regla
-hasta corregir el código y ejecutar esos cinco tests.
-
-Django Admin utiliza:
+The calculator now requires a Django session and uses two roles:
 
 ```text
-Administrators       → Internal User / ALL_CLIENTS / Django Admin operacional
-Super User           → cuenta nativa `super` para setup y recuperación
+Customer User -> one client only
+Internal User -> all clients or selected clients
 ```
 
-Después de aplicar las migraciones:
+The backend validates the client for the page, products and calculation. Changing `client_code` in the browser does not permit access to another client.
+
+Authorisation and client isolation have passing targeted tests. Complete uniformity of the login rejection message remains open: four `test_login_security` tests document the difference between the expected generic form and the active login view. Do not treat that rule as complete until the code is corrected and all five tests are run.
+
+Django Admin uses:
+
+```text
+Administrators       -> Internal User / ALL_CLIENTS / operational Django Admin
+Super User           -> native `super` account for setup and recovery
+```
+
+After applying migrations:
 
 ```powershell
 docker compose exec web python manage.py setup_access_roles
 ```
 
-Crear Customer User:
+Create a Customer User:
 
 ```powershell
 docker compose exec -it web python manage.py create_calculator_user `
@@ -208,7 +198,7 @@ docker compose exec -it web python manage.py create_calculator_user `
   --set-password
 ```
 
-Crear Administrator:
+Create an Administrator:
 
 ```powershell
 docker compose exec -it web python manage.py create_calculator_user `
@@ -219,9 +209,9 @@ docker compose exec -it web python manage.py create_calculator_user `
   --set-password
 ```
 
-Ver `docs/05_authentication_integration.md`, `business_rules/users.md` y ADR 0005.
+See `docs/05_authentication_integration.md`, `business_rules/users.md` and ADR 0005.
 
-### Grupos principales de usuarios
+### Primary user groups
 
 ```text
 Administrators
@@ -229,11 +219,9 @@ Customers
 Steadfast Users
 ```
 
-Los permisos individuales no se editan en Users. Se administran únicamente en
-Groups. El grupo seleccionado sincroniza el perfil de calculadora, el alcance
-de clientes y `is_staff`. La cuenta nativa `super` no requiere grupo principal.
+Individual permissions are not edited in Users. They are managed only through Groups. The selected group synchronises the calculator profile, client scope and `is_staff`. The native `super` account does not require a primary group.
 
-## Calculator visual layout — 2026-07-31
+## Calculator visual layout - 2026-07-31
 
 The calculator uses a responsive two-column desktop layout:
 
@@ -241,41 +229,30 @@ The calculator uses a responsive two-column desktop layout:
 Route / Shipment / Results | Shipment summary / Calculate freight
 ```
 
-The refresh is presentation-only. Existing DOM identifiers, JavaScript
-functions, request payload, API endpoint and calculation services are retained.
-No staged `Destination / Shipment / Compare rates` navigation and no
-unimplemented quotation controls are included.
+The refresh is presentation-only. Existing DOM identifiers, JavaScript functions, request payload, API endpoint and calculation services are retained. No staged `Destination / Shipment / Compare rates` navigation or unimplemented quotation controls are included.
 
+## Remembered Fuel source URL - 2026-08-03
 
-## Remembered Fuel source URL — 2026-08-03
+`Imports -> External data files -> Fetch fuel from source` exposes an editable HTTP/HTTPS URL. The most recent URL that downloaded and validated successfully is remembered separately for each client through the existing `ExternalDataFile.source_url` history. If no successful history exists, the form uses `FUEL_SOURCE_URL`.
 
-`Imports → External data files → Fetch fuel from source` exposes an editable
-HTTP/HTTPS URL. The most recent URL that downloaded and validated successfully
-is remembered separately for each client through the existing
-`ExternalDataFile.source_url` history. If no successful history exists, the
-form uses `FUEL_SOURCE_URL`.
-
-Product and Stock remain local reference-file uploads. Their original filenames
-and import history are retained, but browsers do not expose or allow Django to
-prefill the user's local directory.
+Product and Stock remain local reference-file uploads. Their original filenames and import history are retained, but browsers do not expose or allow Django to prefill the user's local directory.
 
 ## Cubic Margin
 
-La calculadora incorpora un campo web `Cubic Margin (%)` con valores enteros de 0 a 20. Es una regla propia de la aplicación y no una entrada original del Excel.
+The calculator provides a web-only `Cubic Margin (%)` field with integer values from 0 to 20. This is an application rule and not an original Excel input.
 
 ```text
-visible ajustado = ROUND_UP(visible original × (1 + margen/100), 3 decimales)
-rating ajustado  = visible ajustado + cubic interno de pallets
+adjusted visible = ROUND_UP(original visible x (1 + margin/100), 3 decimal places)
+adjusted rating  = adjusted visible + internal pallet cubic
 ```
 
-El valor predeterminado es 0 %, por lo que las baterías Excel vs Django existentes no cambian. El código incluye siete pruebas unitarias para 0 %, 10 %, 20 %, redondeo y valores inválidos; la ejecución completa debe confirmarse en Docker porque el diagnóstico del ZIP no terminó la suite.
+The default is 0%, so existing Excel-vs-Django batteries do not change. The code contains seven unit tests for 0%, 10%, 20%, rounding and invalid values. A complete Docker run still needs to be captured because the packaged diagnostic did not complete the suite.
 
 ## Autocomplete data
 
-Los campos de autocompletado de suburbios y productos leen desde PostgreSQL. En una base vacía, el contenedor intenta importar la planilla de muestra después de las migraciones si no existen suburbios cargados.
+Suburb and product autocomplete fields read from PostgreSQL. In an empty database, the container attempts to import the sample workbook after migrations if no suburbs are loaded.
 
-Primero diagnostica con `showmigrations`, `migrate` y el comando de importación manual. No ejecutes `docker compose down -v` como solución inicial: elimina el volumen de PostgreSQL y todos sus datos. Úsalo solo para recrear deliberadamente un entorno descartable y después de confirmar que no necesitas conservar la base.
-
+Diagnose first with `showmigrations`, `migrate` and the manual import command. Do not run `docker compose down -v` as the initial solution: it deletes the PostgreSQL volume and all its data. Use it only when deliberately recreating a disposable environment and after confirming that the database does not need to be retained.
 
 <!-- USER_ADMIN_INTEGRATION_0727.0802 -->
 ## Integrated user administration

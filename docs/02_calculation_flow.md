@@ -63,7 +63,7 @@ Excel does not use one global weight-break rule for every carrier. `BrokerTotals
 
 Implemented carrier-specific selectors:
 
-| Carrier | Service | Excel source | Implemented behavior |
+| Carrier | Service | Excel source | Implemented behaviour |
 |---|---|---|---|
 | `TEAMEX` | `ROAD`, `GENERAL` | `BrokerTotals` rows 13 and 19 | `<751 = 1`, `>751.001 and <1501 = 2`, `>1501.001 and <3001 = 3`, `>3001.001 and <5001 = 4`, `>5000.001 = 5` |
 | `TFMX` | `ROAD` | `BrokerTotals` row 15 | `<251 = 1`, `>251.001 and <751 = 2`, `>751.001 and <1501 = 3`, `>1501.001 and <3001 = 4`, `>3001.001 and <5000 = 5`, `>5000.001 = 6` |
@@ -81,7 +81,7 @@ This correction fixes the observed TEAMEX mismatch for Blair Athol / SA 5084 wit
 
 `TEAMTAS GENERAL` does not use the generic `Rate * kilograms` calculation.
 
-The workbook logic for `TEAMTAS GENERAL` is based on `BrokerTotals` row 20 and includes these important behaviors:
+The workbook logic for `TEAMTAS GENERAL` is based on `BrokerTotals` row 20 and includes these important behaviours:
 
 1. Chargeable units are based on the greater of:
    - rating cubic units: `CalcLines!P29 * cubic_conversion`
@@ -113,6 +113,14 @@ Excel expected: 828.03
 Django before fix: 663983.07
 Django after fix: matches Excel
 ```
+
+Current evidence boundary (reviewed 2026-08-18): the branch is implemented in
+`calculator.py` and the result above remains valid historical evidence. The
+fixed `random_current` workspace has since been overwritten and no longer
+contains this case, its outputs, components, matching baseline and comparison
+report. Therefore `TEAMTAS GENERAL` is not an unresolved first-time bug, but it
+still needs a retained targeted regression set before that branch is changed
+again.
 
 ## Validation baseline alignment rule
 
@@ -161,9 +169,9 @@ snapshot can affect calculator results.
 
 ## Authentication boundary — 2026-07-22
 
-Authentication does not alter the freight formula. Before `FreightCalculatorService.calculate()` is called, the web layer resolves an authorized Client from the authenticated user's profile. The service receives that server-approved `client.code` in `FreightRequest.client_code`.
+Authentication does not alter the freight formula. Before `FreightCalculatorService.calculate()` is called, the web layer resolves an authorised Client from the authenticated user's profile. The service receives that server-approved `client.code` in `FreightRequest.client_code`.
 
-This change must not modify consolidation, zone resolution, rate selection, surcharge, fuel, uprate or display rounding behavior. Existing Excel-vs-Django batteries remain the functional regression authority.
+This change must not modify consolidation, zone resolution, rate selection, surcharge, fuel, uprate or display rounding behaviour. Existing Excel-vs-Django batteries remain the functional regression authority.
 
 ## Product kit model boundary — 2026-07-30
 
@@ -182,7 +190,7 @@ FreightRequest payload keys
 calculate()
 updateProductTotals()
 suburb and product autocomplete
-server-authorized client resolution
+server-authorised client resolution
 ```
 
 Moving `total_weight`, `total_cubic` and the existing Calculate button into the

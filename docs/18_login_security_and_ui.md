@@ -1,7 +1,7 @@
 # Login UI and User Enumeration Protection
 
 **Implemented in source:** 2026-07-24 13:26 Australia/Adelaide
-**Status:** Visual/login flow implemented; uniform rejection behavior remains `PARTIAL / KNOWN DEFECT`.
+**Status:** Visual/login flow implemented; uniform rejection behaviour remains `PARTIAL / KNOWN DEFECT`.
 
 ## Visual behaviour
 

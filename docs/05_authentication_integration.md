@@ -1,4 +1,4 @@
-# Authentication and Authorization Integration
+# Authentication and Authorisation Integration
 
 ## 1. Boundary
 
@@ -11,7 +11,7 @@ The application uses:
 - Django built-in `auth.User`;
 - Django sessions and `AuthenticationMiddleware`;
 - `CalculatorUserProfile` for calculator role and client scope;
-- centralized authorization in `apps.authentication_gateway.services`;
+- centralised authorisation in `apps.authentication_gateway.services`;
 - `DjangoAdminAccessMiddleware` for the minimum Admin model;
 - standard login/logout URLs under `/accounts/`.
 
@@ -33,7 +33,7 @@ CalculatorUserProfile
 
 A database check constraint enforces valid role/scope/single-client combinations. Admin forms and management commands enforce M2M and staff rules.
 
-## 4. Authorization service
+## 4. Authorisation service
 
 ```python
 get_calculator_profile(user)
@@ -113,7 +113,7 @@ Email invitation/password setup is not yet implemented end to end. SMTP settings
 
 All front-end authentication feedback is rendered inside `registration/login.html`.
 
-Confirmed behavior:
+Confirmed behaviour:
 
 - invalid username/password uses the template's generic credential message;
 - valid credentials without calculator entitlement do not create a login session;
@@ -129,7 +129,7 @@ The public access message is intentionally generic:
 Your account does not have access to the Freight Calculator.
 ```
 
-Detailed entitlement reasons remain internal to the authorization service and are not exposed on the public login screen.
+Detailed entitlement reasons remain internal to the authorisation service and are not exposed on the public login screen.
 
 Known defect: the accepted rule requires credential and entitlement rejections
 to use one identical visible message. `CalculatorAuthenticationForm` implements
@@ -142,7 +142,7 @@ Treat uniform user-enumeration protection as partial until those tests pass.
 The supplied login HTML/CSS is the visual reference for the authentication screen.
 The approved sequence is:
 
-1. the complete login card moves from above to its centered position using `fadeInDown`;
+1. the complete login card moves from above to its centred position using `fadeInDown`;
 2. the Steadfast Freight logo fades in after 0.4 seconds;
 3. username, password and submit controls fade in at 0.6, 0.8 and 1.0 seconds;
 4. authentication, entitlement and CSRF messages remain inside the card;
@@ -154,7 +154,7 @@ The dedicated stylesheet is `app/static/css/login.css`. It is intentionally sepa
 <!-- USER_ADMIN_INTEGRATION_0727.0802 -->
 ## Unified Django Admin workflow
 
-`auth.User` remains the identity source and `CalculatorUserProfile` remains the calculator-authorization source. Both are displayed in one User add/change screen. The profile is optional.
+`auth.User` remains the identity source and `CalculatorUserProfile` remains the calculator-authorisation source. Both are displayed in one User add/change screen. The profile is optional.
 
 ## Group-based User administration — 2026-07-30
 
@@ -171,4 +171,3 @@ The User form no longer exposes `user_permissions`, `is_staff` or
 synchronises the calculator profile and staff status from the selected primary
 group. The `super` account is a native Django Super User and does not require a
 primary group or calculator profile.
-

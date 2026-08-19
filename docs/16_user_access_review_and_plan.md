@@ -1,7 +1,7 @@
 # User Access Version 1 — Implementation Record
 
 **Implemented:** 2026-07-22
-**Release state:** Core access/group behavior implemented and targeted tests
+**Release state:** Core access/group behaviour implemented and targeted tests
 passed. Uniform login rejection remains partial with four known
 `test_login_security` failures.
 
@@ -12,7 +12,7 @@ passed. Uniform login rejection remains partial with four known
 - Login and POST logout.
 - Protected calculator page and APIs.
 - Server-side client selection and tampering rejection.
-- Internal client selector populated only from authorized clients.
+- Internal client selector populated only from authorised clients.
 - Protected `Administrators`, `Customers` and `Steadfast Users` group command.
 - Super User remains native Django superuser under the designated account `super`.
 - Middleware enforcing Internal User / All clients / group membership for normal staff.

@@ -58,7 +58,7 @@ Open:
 Django Admin → Imports → External data files
 ```
 
-## 2. Common ExternalDataFile behavior
+## 2. Common ExternalDataFile behaviour
 
 Every upload/download stores:
 
@@ -101,7 +101,7 @@ Upload XLSX
 → locate product_sth/products/product worksheet
 → map required headers by accepted aliases
 → validate every non-empty row
-→ compare normalized SKUs with operational Product rows
+→ compare normalised SKUs with operational Product rows
 → replace ProductSourceRow rows for this uploaded file
 → status VALIDATED
 → create audit event
@@ -299,7 +299,7 @@ docker compose exec web python manage.py shell -c "from apps.products.models imp
 
 The counts must remain unchanged after Product/Stock reference uploads.
 
-## Import authorization update — 2026-07-22
+## Import authorisation update — 2026-07-22
 
 The three Django Admin source flows remain unchanged functionally, but sensitive actions now use explicit permissions:
 

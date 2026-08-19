@@ -19,9 +19,9 @@ A future quotation specification must define and approve at least:
 1. persistent model and identifiers;
 2. client ownership and user visibility;
 3. draft/final/cancelled states;
-4. recalculation and rate-snapshot behavior;
+4. recalculation and rate-snapshot behaviour;
 5. PDF and email rules;
 6. audit retention;
-7. authorization tests and migrations.
+7. authorisation tests and migrations.
 
 Until that specification is accepted, quotation functionality remains outside the implemented scope.

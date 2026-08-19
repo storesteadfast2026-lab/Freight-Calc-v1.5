@@ -22,7 +22,7 @@ Historical duplicate locations and filenames remain as pointer files only.
 They must not declare a second ADR/document or contain independent
 requirements.
 
-Unverified calculation behavior remains marked `PENDING_EXCEL`, `PARCIAL` or `RIESGO_REVISAR`; documentation finalization must not convert unknown Excel logic into a confirmed rule.
+Unverified calculation behaviour remains marked `PENDING_EXCEL`, `PARTIAL` or `REVIEW_RISK`; documentation finalisation must not convert unknown Excel logic into a confirmed rule.
 
 ## Consequences
 

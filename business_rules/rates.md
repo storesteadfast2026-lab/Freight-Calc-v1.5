@@ -10,7 +10,7 @@ For STH, the full calculator workbook imports operational zone, rate, carrier-co
 
 ## RATE-002 — Zone resolution
 
-Django must resolve a freight zone using `suburb + state` before postcode. Postcode-only fallback must not be used to introduce a carrier alias that Excel would not select, including TEAMEX behavior.
+Django must resolve a freight zone using `suburb + state` before postcode. Postcode-only fallback must not be used to introduce a carrier alias that Excel would not select, including TEAMEX behaviour.
 
 ## RATE-003 — Rate lookup key
 
@@ -52,7 +52,7 @@ Operational fuel changes only after explicit Admin activation of a validated `fu
 The following are not closed business rules and must not be changed without directed Excel evidence:
 
 - exact overlength formula and whether `RATES.overlength_charge`, SettingFlags, or both apply;
-- isolated warehouse-handling behavior;
+- isolated warehouse-handling behaviour;
 - hand-unload boundary cases;
 - subsequent-unit boundaries;
-- mixed pallet/carton rate selection beyond the currently documented behavior.
+- mixed pallet/carton rate selection beyond the currently documented behaviour.

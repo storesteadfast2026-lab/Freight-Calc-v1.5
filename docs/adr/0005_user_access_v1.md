@@ -12,7 +12,7 @@ The project already contains migrations and foreign keys referencing `settings.A
 ## Decision
 
 1. Keep Django built-in `auth.User`.
-2. Store normalized calculator-user email in `username` and `email`.
+2. Store normalised calculator-user email in `username` and `email`.
 3. Add `CalculatorUserProfile` in `authentication_gateway`.
 4. Use only `CUSTOMER_USER` and `INTERNAL_USER` calculator roles.
 5. Use `SINGLE_CLIENT`, `SELECTED_CLIENTS` and `ALL_CLIENTS` scopes as defined by role.
@@ -34,7 +34,7 @@ apps.authentication_gateway.middleware.DjangoAdminAccessMiddleware
 setup_access_roles management command
 create_calculator_user management command
 Django login/logout routes and templates
-server-authorized freight views
+server-authorised freight views
 custom ExternalDataFile permissions
 ```
 

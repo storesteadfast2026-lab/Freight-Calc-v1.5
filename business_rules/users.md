@@ -32,11 +32,11 @@ An Internal User uses one of these scopes:
 - `ALL_CLIENTS`; or
 - `SELECTED_CLIENTS` with at least one active client.
 
-The client selector may show only clients returned by the backend authorization service.
+The client selector may show only clients returned by the backend authorisation service.
 
 ## USR-004 — Login identity
 
-Calculator users use normalized lowercase email in both:
+Calculator users use normalised lowercase email in both:
 
 ```text
 User.username
@@ -68,7 +68,7 @@ The group receives operational model permissions and explicit import-action perm
 
 A Super User is a native Django superuser reserved for setup, recovery and exceptional administration. The designated account name is `super`. It is not a calculator business role and does not require a primary access group.
 
-## USR-007 — Backend authorization boundary
+## USR-007 — Backend authorisation boundary
 
 The following routes require an authenticated user with an enabled calculator profile:
 
@@ -79,7 +79,7 @@ The following routes require an authenticated user with an enabled calculator pr
 /api/calculate/
 ```
 
-Client authorization is resolved centrally in `apps.authentication_gateway.services`.
+Client authorisation is resolved centrally in `apps.authentication_gateway.services`.
 
 ## USR-008 — User creation
 
@@ -93,7 +93,7 @@ The command creates an unusable password unless `--set-password` is used interac
 
 ## USR-009 — Quotation permissions
 
-Quotation draft, finalization, PDF, email and ownership rules remain `PENDING` because no persistent Quotation model exists.
+Quotation draft, finalisation, PDF, email and ownership rules remain `PENDING` because no persistent Quotation model exists.
 
 ## USR-010 — Generic login rejection
 

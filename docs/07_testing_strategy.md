@@ -45,7 +45,7 @@ Current battery types:
 | `live_latest` | Stable real 20-case regression battery | `app/apps/freight/fixtures/live_latest/` | `reports/sth_excel_live_comparison_report.csv` |
 | `random_current` | Replaceable random exploratory battery | `app/apps/freight/fixtures/random_current/` | `reports/random_current/sth_excel_random_comparison_report.csv` |
 
-Retained evidence from the reviewed repository snapshot:
+Retained evidence from the review package generated on 2026-08-18:
 
 ```text
 live_latest
@@ -55,6 +55,9 @@ Component rows available: 20
 Included report rows: 97
 OK rows: 97
 FAIL rows: 0
+Matching baseline included: no
+Fixture/baseline SHA-256 manifest included: no
+Fully reproducible from this package: no
 
 random_current
 Cases available: 5
@@ -65,7 +68,7 @@ Comparison report: missing
 Current reproducible status: NOT CONFIRMED
 ```
 
-A previous documented run recorded 15 random cases and 36 OK rows. Treat that as historical evidence only until a complete fixed-folder `random_current` set is regenerated and committed together. Legacy `random_5` and `random_30` folders remain in the supplied tree but must not be used for new runs.
+A previous documented run recorded 15 random cases and 36 OK rows. Treat that as historical evidence only until a complete fixed-folder `random_current` set is regenerated and committed together. Legacy `random_5` and `random_30` folders remain in the supplied tree but must not be used for new runs. The old TEAMTAS case `WEEGENA / BRH4443 x 2` is not part of the current five-case file.
 
 All Excel-vs-Django batteries that import with `--replace` must use an isolated
 PostgreSQL database. The validation command must include
@@ -99,7 +102,7 @@ Priority coverage:
 - pallet-only, carton-only, and mixed P/C shipments
 - postcodes shared by multiple suburbs
 
-## Authentication and authorization tests — 2026-07-22
+## Authentication and authorisation tests — 2026-07-22
 
 Added test modules:
 
@@ -109,7 +112,7 @@ apps.authentication_gateway.tests.test_commands
 apps.freight.tests.test_user_access
 ```
 
-They cover customer isolation, selected/all internal scope, administrator requirements, group creation, user creation, anonymous HTTP behavior and tampered `client_code` rejection.
+They cover customer isolation, selected/all internal scope, administrator requirements, group creation, user creation, anonymous HTTP behaviour and tampered `client_code` rejection.
 
 Required Docker command:
 
@@ -119,7 +122,7 @@ docker compose exec web python manage.py test apps.authentication_gateway apps.f
 
 These tests must pass together with the existing calculation and import tests. Authentication changes do not replace Excel-vs-Django validation because they do not validate freight formulas.
 
-## Current source test inventory — 2026-08-04
+## Current source test inventory — reviewed 2026-08-18
 
 Static test discovery in the current source contains:
 
@@ -131,7 +134,9 @@ Static test discovery in the current source contains:
 ```
 
 The 63-test UI regression was executed before the four additional remembered
-Fuel URL tests and intentionally excluded `test_login_security`. The current
-Fuel patch installer targets 67 tests and still excludes the five
-login-security tests. Four of those five remain a documented known failure;
-do not describe the complete 72-test suite as passing.
+Fuel URL tests and intentionally excluded `test_login_security`. Four of the
+five login-security tests remain documented known failures. The latest
+`TEST_RESULTS.txt` attempted the complete suite but stopped while creating
+`test_freight_platform`; it is not evidence that all 72 tests ran or passed.
+Do not describe the complete suite as runtime verified until a new full output
+is retained.

@@ -2,11 +2,11 @@
 
 ## 1. Current data model
 
-Operational entities already carry Client ownership where required. Version 1 user authorization now adds explicit client scope to each calculator user.
+Operational entities already carry Client ownership where required. Version 1 user authorisation now adds explicit client scope to each calculator user.
 
 ## 2. Customer User
 
-A Customer User is bound to exactly one active Client. The browser may display the client, but it cannot select another client. Backend authorization rejects a different query parameter or JSON `client_code`.
+A Customer User is bound to exactly one active Client. The browser may display the client, but it cannot select another client. Backend authorisation rejects a different query parameter or JSON `client_code`.
 
 ## 3. Internal User
 
@@ -15,7 +15,7 @@ An Internal User has:
 - `ALL_CLIENTS`; or
 - `SELECTED_CLIENTS` through a many-to-many relation.
 
-The calculator client selector is generated from `allowed_clients_for(user)` and therefore shows only authorized active clients.
+The calculator client selector is generated from `allowed_clients_for(user)` and therefore shows only authorised active clients.
 
 ## 4. Backend rule
 

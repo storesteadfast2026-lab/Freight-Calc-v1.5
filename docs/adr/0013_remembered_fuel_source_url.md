@@ -29,7 +29,7 @@ directory.
 - Fall back to `FUEL_SOURCE_URL` when that client has no qualifying history.
 - Do not remember failed downloads or failed validations.
 - Keep activation as a separate explicit operation.
-- Leave Product and Stock local upload behavior unchanged.
+- Leave Product and Stock local upload behaviour unchanged.
 
 ## Consequences
 

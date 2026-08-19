@@ -19,7 +19,7 @@ Available freight options          Total weight
 The staged `Destination / Shipment / Compare rates` progress strip is not part
 of the approved current design.
 
-## Existing behavior preserved
+## Existing behaviour preserved
 
 The following identifiers remain unique and available to the current inline
 JavaScript:
@@ -60,7 +60,7 @@ calculate()
 `item_count` displays the number of visible shipment rows. It is not sent to
 Django and does not affect consolidation or rating.
 
-## Responsive behavior
+## Responsive behaviour
 
 - Desktop: summary remains in the right column and can stay visible while
   scrolling.
@@ -82,7 +82,7 @@ The refresh does not implement:
 
 ## Change boundary
 
-Production behavior changes are limited to:
+Production behaviour changes are limited to:
 
 ```text
 app/templates/freight/calculator.html

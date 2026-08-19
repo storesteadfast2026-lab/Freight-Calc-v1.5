@@ -9,7 +9,7 @@ The application migrates freight calculation logic from the STH Excel workbook t
 3. Django calculates the same cases using imported PostgreSQL data.
 4. `validate_excel_battery` compares Excel expected outputs against Django actual outputs.
 
-The goal is not simply to make tests pass. The goal is to prove that Django reproduces Excel behavior for each documented scenario.
+The goal is not simply to make tests pass. The goal is to prove that Django reproduces Excel behaviour for each documented scenario.
 
 ## Official source of truth
 
@@ -51,6 +51,16 @@ OK rows: 97
 FAIL rows: 0
 ```
 
+Evidence classification for the package generated on 2026-08-18:
+
+```text
+Fixtures and passing comparison report retained: YES
+Matching Excel baseline retained: NO
+SHA-256 pairing manifest retained: NO
+Historical result confirmed by included report: YES
+Full run reproducible from this package alone: NO
+```
+
 ### random_current
 
 Replaceable random exploratory battery. This folder is intentionally reused and overwritten for new random checks.
@@ -70,7 +80,7 @@ OK rows: 36
 FAIL rows: 0
 ```
 
-This historical result is not reproducible from the 2026-07-28 review package. The package contains only `sth_excel_random_cases.csv` with 5 cases under `random_current`; the matching outputs, components, Excel baseline and report are absent. Regenerate all four artifacts together before calling the current random battery passing.
+This historical result is not reproducible from the 2026-08-18 review package. The package contains only `sth_excel_random_cases.csv` with 5 cases under `random_current`; the matching outputs, components, Excel baseline and report are absent. Regenerate all four artifacts together before calling the current random battery passing.
 
 The only supported random workspace is `random_current`. Do not create or use `random_5`, `random_10`, `random_30` or similar folders for future runs; legacy folders in the repository should be treated as deprecated evidence.
 

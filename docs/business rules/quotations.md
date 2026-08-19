@@ -6,4 +6,4 @@ The canonical Quotation scope record is in:
 business_rules/quotations.md
 ```
 
-Quotation behavior remains `PENDING`; no persistent Quotation model exists in the delivered project.
+Quotation behaviour remains `PENDING`; no persistent Quotation model exists in the delivered project.

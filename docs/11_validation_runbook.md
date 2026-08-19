@@ -40,7 +40,8 @@ database. Do not replace it with `docker compose exec web`, because `exec web`
 uses the operational database configured for the running application.
 
 For the currently retained `live_latest_refresh` evidence, first verify the
-baseline path that exists in the full repository:
+baseline path in the full repository. The 2026-08-18 review ZIP does not
+include this file:
 
 ```powershell
 $LiveBaselineRelative = `
@@ -146,7 +147,7 @@ FAIL rows: 0
 
 ### random_current
 
-A previous documented run recorded 15 cases and 36 OK rows. The 2026-07-28 review package does not contain the complete matching evidence set, so the current random status must be treated as not confirmed until regenerated. The package currently has 5 input cases only.
+A previous documented run recorded 15 cases and 36 OK rows. The 2026-08-18 review package does not contain the complete matching evidence set, so the current random status must be treated as not confirmed until regenerated. The package currently has 5 input cases only.
 
 ## Regenerate random_current using fixed paths and names
 
@@ -269,7 +270,7 @@ Expected test discovery from the current source:
 Found 7 test(s)
 ```
 
-Record the actual `OK` result; do not infer it solely from source inspection. Then run the standard 0% Excel-vs-Django battery to confirm that default behavior remains unchanged.
+Record the actual `OK` result; do not infer it solely from source inspection. Then run the standard 0% Excel-vs-Django battery to confirm that default behaviour remains unchanged.
 
 ## Validate the calculator visual-only refresh
 
@@ -402,11 +403,15 @@ docker compose exec web python manage.py shell -c "from apps.imports.models impo
 
 ### Current review-package limitation
 
-The 2026-07-28 review package reported `manage.py check` and migrations successfully, but its complete test-suite capture stopped while creating the test database and its database-summary command was malformed. Re-run the commands above in the project environment before treating the runtime state as fully verified.
+The 2026-08-18 review package reports `manage.py check` successfully and lists
+all migrations as applied. Its complete test-suite capture stopped while
+creating `test_freight_platform`, and its database-summary command was
+malformed. Re-run the commands above in the full project environment before
+treating the runtime state as fully verified.
 
 ## User-access implementation validation order
 
-When user code is authorized, validate in this order:
+When user code is authorised, validate in this order:
 
 ```text
 1. model/profile validation tests
@@ -416,7 +421,7 @@ When user code is authorized, validate in this order:
 5. Admin custom-action permission tests
 6. interactive password setup tests; email invitation/reset delivery remains pending
 7. existing freight and import regression tests
-8. Excel-vs-Django batteries to prove calculation behavior is unchanged
+8. Excel-vs-Django batteries to prove calculation behaviour is unchanged
 ```
 
 ## User access deployment and validation — 2026-07-22

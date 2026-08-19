@@ -13,7 +13,7 @@ Use this order:
 3. Accepted ADRs in `docs/adr/`.
 4. Current code and migrations.
 5. Automated tests and runtime evidence.
-6. Excel workbook and Excel-vs-Django reports for calculation behavior.
+6. Excel workbook and Excel-vs-Django reports for calculation behaviour.
 7. Other explanatory Markdown.
 
 For calculation logic, Excel remains the functional source of truth. For web-only features such as users and permissions, approved business rules and decisions are the source of truth.
@@ -37,7 +37,7 @@ Before changing calculation logic:
 
 1. Identify the Excel source sheet/cells or imported data.
 2. Create or identify a failing Excel-vs-Django case.
-3. Explain Django behavior and Excel behavior.
+3. Explain Django behaviour and Excel behaviour.
 4. Patch the smallest reasonable code area.
 5. Run the relevant battery with the matching baseline.
 6. Update Markdown documentation.
@@ -46,14 +46,14 @@ Run any battery that imports with `--replace` in an isolated PostgreSQL
 database and include `--fail-on-difference`. A report file alone is not proof
 that the command returned failure when mismatches existed.
 
-Before changing web-only behavior such as users/access:
+Before changing web-only behaviour such as users/access:
 
 1. Update `business_rules/` with confirmed/proposed rules.
 2. Record the decision in `decisions/` or a proposed ADR.
 3. Inspect current models, middleware, views and permissions.
 4. Identify security and migration effects.
 5. Implement one phase at a time.
-6. Add backend authorization tests before UI-only tests.
+6. Add backend authorisation tests before UI-only tests.
 7. Update operational and troubleshooting documentation.
 
 ## Required explanation for each change
@@ -62,8 +62,8 @@ Before changing web-only behavior such as users/access:
 File changed:
 Reason:
 Source evidence:
-Behavior before:
-Behavior after:
+Behaviour before:
+Behaviour after:
 Validation command:
 Validation result:
 Docs updated:

@@ -1,5 +1,42 @@
 # Validation Findings Log
 
+## 2026-08-18 — Code/documentation reconciliation of review package 0818.1318
+
+- **Scope reviewed:** `README.md`, all 44 Markdown files under `docs/`,
+  canonical `business_rules/` and `decisions/`, core Django models, freight
+  engine, workbook importer, Excel generator, validation command, fixtures,
+  reports and packaged diagnostics.
+- **Code state:** branch `main`, commit
+  `6197775e57e2917c83b715e3991c342899977e95`.
+- **Calculation finding:** `TEAMTAS GENERAL` is already implemented through
+  carrier-specific chargeable units, base freight, fee and display rounding.
+  It is not an outstanding first-time correction.
+- **Evidence gap:** its historical `WEEGENA TAS 7304 / BRH4443 x 2` regression
+  case is no longer present in the overwritten `random_current` workspace.
+  The branch requires a newly retained targeted baseline before future edits.
+- **Live evidence:** the package includes 20 cases, 77 expected rank rows, 20
+  component rows and a 97-row canonical report with 97 OK / 0 FAIL.
+- **Reproducibility gap:** the matching `live_latest` Excel baseline and
+  fixture/baseline SHA-256 manifest are absent, so the run cannot be repeated
+  from the ZIP alone.
+- **Random evidence:** `random_current` contains only five case inputs; outputs,
+  components, baseline and comparison report are absent.
+- **Runtime evidence:** `DJANGO_CHECK.txt` succeeded and migration status is
+  captured. `TEST_RESULTS.txt` stopped at test-database creation and
+  `DATABASE_SUMMARY.txt` contains no counts because its command was malformed.
+- **Packaging finding:** `docker-compose.yml` references
+  `docker/django/Dockerfile`, but that Dockerfile and the populated operational
+  `sample_data/` paths are not in the ZIP.
+- **Known open defect:** `CalculatorAuthenticationForm` exists but is not
+  assigned to `CalculatorLoginView`; four login-security rejection tests remain
+  open, consistently with the existing documentation.
+- **Documentation correction:** current-package dates, evidence classifications,
+  TEAMTAS status, runtime limitations and the continuation prompt were updated.
+- **Calculation impact:** none. No Python, migration, workbook, fixture or
+  report was changed.
+- **ADR:** none required; this reconciliation records evidence and removes stale
+  status wording without making a new architectural or business decision.
+
 ## 2026-08-04 — Documentation and validation-safety audit
 
 - **Scope reviewed:** README plus 47 Markdown files under `business_rules/`,
@@ -158,7 +195,7 @@ visible_cubic = rating_cubic - pallet_count * 0.02
 
 ### Zone resolution order
 
-Excel behavior requires exact `suburb + state` match before postcode-only fallback. Many Australian suburbs share postcodes.
+Excel behaviour requires exact `suburb + state` match before postcode-only fallback. Many Australian suburbs share postcodes.
 
 TEAMEX must not freely fall back to postcode-only aliases when Excel does not rate the carrier that way.
 
@@ -177,7 +214,7 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 - **Change:** removed the nullable join and restricted the lock to
   `ClientCarrierConfig` with `select_for_update(of=('self',))`.
 - **Business logic impact:** none. Fuel matching, validation, activation,
-  rollback and audit behavior remain unchanged.
+  rollback and audit behaviour remain unchanged.
 - **Regression command:**
   `docker compose exec web python manage.py test apps.imports.tests.test_fuel_import -v 2`.
 
@@ -205,9 +242,9 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 
 - **Status:** Implemented, documentation updated.
 - **Files:** `product_sth.xlsx` and `stock_sth.xlsx`.
-- **Behavior:** upload, SHA-256, validation, audit and isolated source-row storage.
+- **Behaviour:** upload, SHA-256, validation, audit and isolated source-row storage.
 - **Operational impact:** none; `Product`, `FreightRate`, `FreightZone`, `ClientCarrierConfig` and calculation code are not updated.
-- **Duplicate behavior:** Product duplicate SKUs inside one file fail validation; Stock duplicate SKUs are preserved with a warning; duplicate file content is reported.
+- **Duplicate behaviour:** Product duplicate SKUs inside one file fail validation; Stock duplicate SKUs are preserved with a warning; duplicate file content is reported.
 - **Activation:** Product/Stock files have no Activate or Rollback operation.
 - **Evidence:** migration `imports.0003_product_stock_reference_sources`, service code and 6 Product/Stock tests.
 
@@ -223,8 +260,8 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 
 - **Historical status:** This review identified that calculator endpoints lacked user/client scope and custom Admin actions relied too broadly on `is_staff`.
 - **Decision:** Keep only Customer User and Internal User calculator roles; keep Django Admin separate.
-- **Correction to Codex draft:** quotation visibility/draft/finalization/PDF/email rules remain pending because no persisted Quotation model exists.
-- **Implemented outcome:** one `Django Administrator` group, Technical Superusers, calculator profiles, backend client authorization and explicit import-action permissions.
+- **Correction to Codex draft:** quotation visibility/draft/finalisation/PDF/email rules remain pending because no persisted Quotation model exists.
+- **Implemented outcome:** one `Django Administrator` group, Technical Superusers, calculator profiles, backend client authorisation and explicit import-action permissions.
 
 ## 2026-07-22 — random_current evidence set incomplete in review package
 
@@ -249,7 +286,7 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 ## 2026-07-22 — User access Version 1
 
 - **Finding:** Calculator and APIs were public and accepted browser-supplied client identifiers.
-- **Resolution:** Added session authentication, calculator profiles and centralized backend client authorization.
+- **Resolution:** Added session authentication, calculator profiles and centralised backend client authorisation.
 - **Finding:** Django `is_staff` was sufficient for several custom import/audit views.
 - **Resolution:** Added minimum administrator middleware and explicit permissions for validate, activate, rollback and download operations.
 - **Finding:** Codex proposal included quotation actions that have no current persistent model.
@@ -260,9 +297,9 @@ KTI required higher decimal precision in imported rates. `FreightRate` decimal p
 
 - **Observed:** an authenticated Django user without `CalculatorUserProfile` received a blank page containing `This user does not have a calculator access profile.`
 - **Root cause:** `calculator_access_required` returned `HttpResponseForbidden` directly for non-API requests.
-- **Security concern:** the browser exposed an internal entitlement reason and left an authenticated-but-unauthorized session active.
-- **Resolution:** introduced entitlement-aware `CalculatorLoginView`; unauthorized sessions are cleared and all public feedback is rendered inside the login card with a generic message.
-- **CSRF behavior:** CSRF remains enabled. Front-end CSRF failures now use the login-card visual response; API failures remain JSON and Django Admin retains its own behavior.
+- **Security concern:** the browser exposed an internal entitlement reason and left an authenticated-but-unauthorised session active.
+- **Resolution:** introduced entitlement-aware `CalculatorLoginView`; unauthorised sessions are cleared and all public feedback is rendered inside the login card with a generic message.
+- **CSRF behaviour:** CSRF remains enabled. Front-end CSRF failures now use the login-card visual response; API failures remain JSON and Django Admin retains its own behaviour.
 - **Calculation impact:** none.
 - **Migration required:** no.
 - **Verification:** run `apps.authentication_gateway.tests.test_login_flow` and `apps.freight.tests.test_user_access` in Docker.
@@ -305,7 +342,7 @@ Confirmed cause: creating a user in Django Admin created `auth.User` but not `Ca
 - **Finding:** documentation used the historical `C:\Docker-Projects\Freight-Calc-Nuevo` path.
 - **Resolution:** all operational commands now use `C:\Docker-Projects\Freight-Calc-Nuevo`.
 - **Finding:** Product, Rate and Quotation business-rule files were placeholders.
-- **Resolution:** Product and Rate files now contain only confirmed behavior plus explicit Excel-dependent pending items; Quotation remains an explicit pending specification because no model exists.
+- **Resolution:** Product and Rate files now contain only confirmed behaviour plus explicit Excel-dependent pending items; Quotation remains an explicit pending specification because no model exists.
 - **Calculation impact:** none. No Python, migration, template, CSS, CSV, report or workbook content was changed.
 
 ## 2026-07-30 — Group-only User permissions

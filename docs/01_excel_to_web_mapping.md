@@ -29,7 +29,7 @@ The Django rate lookup must not use one global `WeightBrk` formula for all carri
 
 Observed correction:
 
-| Scenario | Excel behavior | Previous app behavior | Corrected app behavior |
+| Scenario | Excel behaviour | Previous app behaviour | Corrected app behaviour |
 |---|---|---|---|
 | `TEAMEX ROAD`, chargeable weight 2075 kg | `WeightBrk = 3` | `WeightBrk = 4` | `WeightBrk = 3` |
 

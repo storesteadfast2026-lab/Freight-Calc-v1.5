@@ -29,7 +29,7 @@ and excluded from the request.
 
 - No model, migration, database or calculation change.
 - No Excel-vs-Django expected value changes.
-- Login, authorization and server-side client selection remain unchanged.
+- Login, authorisation and server-side client selection remain unchanged.
 - Calculator CSS is scoped under `.calculator-page` so the login design is not
   restyled.
 - Saved shipment and result-detail controls remain absent until separately

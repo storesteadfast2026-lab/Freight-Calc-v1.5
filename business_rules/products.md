@@ -10,7 +10,7 @@ The calculator uses Django `Product` rows as the operational SKU master. For STH
 
 ## PROD-002 — Client isolation
 
-A Product is unique by `client + sku`. Product lookup and calculation must use the server-authorized client.
+A Product is unique by `client + sku`. Product lookup and calculation must use the server-authorised client.
 
 ## PROD-003 — Confirmed product fields
 
@@ -43,11 +43,11 @@ C = Case/Carton
 
 ## PROD-005 — Consolidation evidence
 
-Product dimensions, weight, cubic and freight type feed freight-line consolidation. The exact behavior for mixed P/C shipments, quantities greater than one and overlength remains subject to directed Excel-vs-Django cases.
+Product dimensions, weight, cubic and freight type feed freight-line consolidation. The exact behaviour for mixed P/C shipments, quantities greater than one and overlength remains subject to directed Excel-vs-Django cases.
 
 ## PROD-006 — Change control
 
-Do not change product-derived calculation behavior only to satisfy a Django test. A calculation change requires:
+Do not change product-derived calculation behaviour only to satisfy a Django test. A calculation change requires:
 
 1. a confirmed Excel input/output case;
 2. the matching Excel baseline;
