@@ -92,7 +92,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Imported workbook for {client.code}: {summary}'))
 
     def replace_client_data(self, client):
-        """Clear client-specific imported tables / Limpia tablas importadas del cliente."""
+        """Clear imported tables for the selected client."""
         FreightRate.objects.filter(client=client).delete()
         FreightZone.objects.filter(client=client).delete()
         CarrierTailgateCharge.objects.filter(client=client).delete()

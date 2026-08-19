@@ -4,7 +4,7 @@ from apps.clients.models import Client
 
 
 class Carrier(models.Model):
-    """Transport provider / Transportista."""
+    """Transport provider."""
     code = models.CharField(max_length=40, unique=True)
     name = models.CharField(max_length=150, blank=True)
     active = models.BooleanField(default=True)
@@ -17,7 +17,7 @@ class Carrier(models.Model):
 
 
 class CarrierService(models.Model):
-    """Carrier + service combination / Combinación carrier + service."""
+    """Carrier and service combination."""
     carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='services')
     service_code = models.CharField(max_length=40)
     service_name = models.CharField(max_length=150, blank=True)
@@ -36,10 +36,9 @@ class CarrierService(models.Model):
 
 
 class ClientCarrierConfig(models.Model):
-    """Per-client carrier configuration / Equivalente a filas de FuelSurcharge.
+    """Per-client carrier configuration equivalent to FuelSurcharge rows.
 
-    English: Most fields map to columns in FuelSurcharge G:AD.
-    Español: La mayoría de campos replica columnas de FuelSurcharge G:AD.
+    Most fields map to columns in FuelSurcharge G:AD.
     """
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='carrier_configs')
     carrier_service = models.ForeignKey(CarrierService, on_delete=models.CASCADE)

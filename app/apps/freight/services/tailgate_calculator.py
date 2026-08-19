@@ -5,8 +5,7 @@ from apps.rates.models import CarrierTailgateCharge
 def calculate_tailgate(client, carrier, pallet_count: Decimal, tailgate: bool) -> Decimal:
     """Replicates SettingFlags tailgate total.
 
-    English: If tailgate is YES, charge max(minimum, per-pallet * pallets).
-    Español: Si tailgate es YES, cobra el mayor entre mínimo y cargo por pallet * pallets.
+    If tailgate is YES, charge max(minimum, per-pallet * pallets).
     """
     if not tailgate:
         return Decimal('0')

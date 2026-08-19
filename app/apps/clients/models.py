@@ -2,7 +2,7 @@ from django.db import models
 
 
 class Client(models.Model):
-    """Customer account / Cliente propietario de una calculadora."""
+    """Customer account that owns a calculator."""
     code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=150)
     active = models.BooleanField(default=True)
@@ -17,7 +17,7 @@ class Client(models.Model):
 
 
 class FreightCalculator(models.Model):
-    """Calculator configuration by client / Configuración de calculadora por cliente."""
+    """Calculator configuration for each client."""
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='calculators')
     name = models.CharField(max_length=150)
     version = models.CharField(max_length=80, blank=True)

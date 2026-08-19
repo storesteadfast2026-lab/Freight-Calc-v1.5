@@ -62,13 +62,8 @@ def apply_cubic_margin(consolidated, margin_percent: Decimal):
 def _teamex_weight_break(weight: Decimal) -> str:
     """BrokerTotals TEAMEX ROAD/GENERAL weight break selector.
 
-    English:
     Mirrors the formulas in BrokerTotals rows 13 and 19, columns AJ:AO.
     For example, 2075 kg must resolve to break 3, not break 4.
-
-    Español:
-    Replica las fórmulas de BrokerTotals filas 13 y 19, columnas AJ:AO.
-    Por ejemplo, 2075 kg debe resolver al tramo 3, no al tramo 4.
     """
     if weight < Decimal('751'):
         return '1'
@@ -86,8 +81,7 @@ def _teamex_weight_break(weight: Decimal) -> str:
 def _tfmx_weight_break(weight: Decimal) -> str:
     """BrokerTotals TFMX ROAD weight break selector.
 
-    English: Mirrors BrokerTotals row 15, columns AI:AO.
-    Español: Replica BrokerTotals fila 15, columnas AI:AO.
+    Mirrors BrokerTotals row 15, columns AI:AO.
     """
     if weight < Decimal('251'):
         return '1'
@@ -107,11 +101,8 @@ def _tfmx_weight_break(weight: Decimal) -> str:
 def _teamtas_weight_break(weight: Decimal) -> str:
     """BrokerTotals TEAMTAS GENERAL break selector.
 
-    English: Mirrors BrokerTotals row 20. The workbook assigns break 3
+    Mirrors BrokerTotals row 20. The workbook assigns break 3
     to both 13-15.99 and 16-17.99 intervals.
-
-    Español: Replica BrokerTotals fila 20. La planilla asigna el tramo 3
-    tanto al intervalo 13-15.99 como al intervalo 16-17.99.
     """
     if weight < Decimal('7.99'):
         return '1'
@@ -146,11 +137,8 @@ def _is_teamtas_general_rate(rate: FreightRate) -> bool:
 def _machipe_mipec_weight_break(weight: Decimal) -> str:
     """BrokerTotals MACHIPE/MIPEC ROAD break selector.
 
-    English: Mirrors BrokerTotals rows 17 and 21, where break 2 is
+    Mirrors BrokerTotals rows 17 and 21, where break 2 is
     selected only when chargeable weight is greater than 30.
-
-    Español: Replica BrokerTotals filas 17 y 21, donde el tramo 2 se
-    selecciona solo cuando el peso cobrable es mayor que 30.
     """
     if weight > Decimal('30'):
         return '2'
@@ -160,15 +148,9 @@ def _machipe_mipec_weight_break(weight: Decimal) -> str:
 def excel_weight_break(weight: Decimal) -> str:
     """Legacy generic selector kept for compatibility.
 
-    English:
     Do not use this function for carrier rate lookup. Excel does not use a
     single global weight-break rule; BrokerTotals defines carrier-specific
     formulas. Use ``resolve_weight_break_for_config`` instead.
-
-    Español:
-    No usar esta función para buscar tarifas por carrier. Excel no usa una
-    regla global única; BrokerTotals define fórmulas específicas por carrier.
-    Usar ``resolve_weight_break_for_config``.
     """
     if weight <= Decimal('251'):
         return '1'
@@ -184,17 +166,10 @@ def excel_weight_break(weight: Decimal) -> str:
 def resolve_weight_break_for_config(cfg: ClientCarrierConfig, weight: Decimal) -> str:
     """Resolve BrokerTotals AO WeightBrk using the carrier-specific Excel row.
 
-    English:
     The previous implementation applied one generic break function to all
     carriers. That made TEAMEX use break 4 at 2075 kg, while Excel uses
     TEAMEX break 3. This dispatcher prevents TEAMEX logic from leaking into
     TFMX, TEAMTAS, MACHIPE, MIPEC, or carriers with blank WeightBrk.
-
-    Español:
-    La implementación anterior aplicaba una función genérica a todos los
-    carriers. Eso hacía que TEAMEX usara el tramo 4 con 2075 kg, mientras
-    Excel usa el tramo 3. Este despachador evita que la lógica de TEAMEX se
-    aplique a TFMX, TEAMTAS, MACHIPE, MIPEC o carriers con WeightBrk vacío.
     """
     carrier_code = (cfg.carrier_service.carrier.code or '').strip().upper()
     service_code = (cfg.carrier_service.service_code or '').strip().upper()
@@ -214,8 +189,7 @@ def resolve_weight_break_for_config(cfg: ClientCarrierConfig, weight: Decimal) -
 def overlength_fee(max_length_m: Decimal) -> Decimal:
     """SettingFlags TEAMEXWGTBKTAB approximation.
 
-    English: Excel uses bracket numbers and a lookup table for overlength.
-    Español: Excel usa números de tramo y una tabla para sobrelargo.
+    Excel uses bracket numbers and a lookup table for overlength.
     """
     if max_length_m < Decimal('2.5'):
         return Decimal('0')
@@ -229,11 +203,10 @@ def overlength_fee(max_length_m: Decimal) -> Decimal:
 
 
 class FreightCalculatorService:
-    """Main freight engine / Motor principal de flete.
+    """Main freight engine.
 
-    English: This version maps the Excel flow more closely:
+    This version maps the Excel flow more closely:
     Calculator -> CalcLines -> FuelSurcharge -> ZONES -> RATES -> BrokerTotals.
-    Español: Esta versión replica más de cerca el flujo del Excel.
     """
 
     def calculate(self, request: FreightRequest) -> list[FreightResult]:
@@ -325,10 +298,9 @@ class FreightCalculatorService:
         return sorted(results, key=lambda r: r.estimate_ex_gst)
 
     def _carrier_status(self, cfg: ClientCarrierConfig, request: FreightRequest, consolidated) -> str:
-        """Replicate FuelSurcharge!AA status behavior.
+        """Replicate FuelSurcharge!AA status behaviour.
 
-        English: L is contextual, not a fixed carrier flag.
-        Español: L es contextual, no una bandera fija del carrier.
+        L is contextual, not a fixed carrier flag.
         """
         if cfg.base_status != 'L' or not cfg.active:
             return 'X'
@@ -419,13 +391,9 @@ class FreightCalculatorService:
     def _calculate_base_freight(self, rate: FreightRate, weight: Decimal, unit_count: Decimal, cfg: ClientCarrierConfig, consolidated) -> Decimal:
         """Replicate BrokerTotals!L main formula.
 
-        English: Most carriers use Basic + Subsequent + Rate*ChargeableWeight.
+        Most carriers use Basic + Subsequent + Rate*ChargeableWeight.
         TEAMTAS GENERAL row 20 is different: Excel multiplies Basic by rating
         cubic units before adding Rate*whole-tonne chargeable weight.
-
-        Español: La mayoría de carriers usa Basic + Subsequent + Rate*PesoCobrable.
-        TEAMTAS GENERAL fila 20 es distinto: Excel multiplica Basic por el cubic
-        rating antes de sumar Rate*peso cobrable en toneladas/unidades enteras.
         """
         subsequent = Decimal('0')
         if unit_count > Decimal('1.99'):

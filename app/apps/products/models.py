@@ -4,7 +4,7 @@ from apps.clients.models import Client
 
 
 class Product(models.Model):
-    """Client SKU master / Equivalente a hoja SKUs."""
+    """Client SKU master equivalent to the SKUs worksheet."""
     FREIGHT_TYPES = [('P', 'Pallet'), ('C', 'Case/Carton')]
 
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='products')
@@ -30,7 +30,7 @@ class Product(models.Model):
 
 
 class ProductKitComponent(models.Model):
-    """Kit component / Equivalente inicial para hoja SKU-Kits."""
+    """Initial kit-component equivalent for the SKU-Kits worksheet."""
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
     parent_sku = models.CharField(max_length=80)
     component_sku = models.CharField(max_length=80)

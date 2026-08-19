@@ -1,28 +1,28 @@
 ﻿<#
 .SYNOPSIS
-  Crea un ZIP seguro y completo para revisar el codigo actual de STH Freight Calculator con una IA.
+  Creates a safe, complete ZIP for reviewing the current STH Freight Calculator code with AI.
 
 .DESCRIPTION
-  Version corregida: usa la sintaxis valida de PowerShell `elseif` en el bloque de diagnosticos.
+  Corrected version: uses valid PowerShell `elseif` syntax in the diagnostics block.
 
-  Ejecuta este script desde la raiz del proyecto Django, por ejemplo:
+  Run this script from the root of the Django project, for example:
 
     C:\Docker-Projects\Freight-Calc-Nuevo
 
-  El paquete incluye:
-    - Codigo Django/Python, templates, JavaScript, CSS, migraciones y pruebas.
-    - Configuracion de Docker e instalacion disponible en la raiz.
-    - Documentacion y reportes, salvo que se indique -SkipReports.
-    - Archivos Excel de referencia conocidos, si estan disponibles, salvo que se indique -SkipReferenceFiles.
-    - Arbol del proyecto, estado Git, chequeo Django, migraciones, resumen no sensible de la base y resultados de pruebas.
+  The package includes:
+    - Django/Python code, templates, JavaScript, CSS, migrations and tests.
+    - Docker configuration and installation files available at the project root.
+    - Documentation and reports unless -SkipReports is specified.
+    - Known reference Excel files, if available, unless -SkipReferenceFiles is specified.
+    - Project tree, Git status, Django check, migrations, non-sensitive database summary and test results.
 
-  El paquete excluye:
-    - Entornos virtuales, caches, .git, node_modules y archivos generados.
-    - .env reales, credenciales, certificados, claves privadas y dumps de base de datos.
-    - media, uploaded_data, staticfiles, logs y ZIP anteriores.
-    - Un backup completo de PostgreSQL.
+  The package excludes:
+    - Virtual environments, caches, .git, node_modules and generated files.
+    - Real .env files, credentials, certificates, private keys and database dumps.
+    - media, uploaded_data, staticfiles, logs and earlier ZIP files.
+    - A complete PostgreSQL backup.
 
-  La inclusion de archivos Excel es controlada: solo se buscan los tres archivos de referencia conocidos.
+  Excel file inclusion is controlled: only the three known reference files are searched for.
 
 .EXAMPLE
   .\Create_Files_Review_zip.ps1

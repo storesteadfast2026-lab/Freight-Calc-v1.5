@@ -3,8 +3,8 @@
 /*
 Approved login visual baseline.
 The complete login card moves down from above, while the logo and fields
-appear sequentially. This preserves the supplied reference behavior without
-changing Django authentication, CSRF, messages or authorization.
+appear sequentially. This preserves the supplied reference behaviour without
+changing Django authentication, CSRF, messages or authorisation.
 */
 
 html {

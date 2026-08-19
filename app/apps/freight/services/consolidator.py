@@ -14,8 +14,7 @@ PALLET_CUBIC_M3 = _decimal_setting('FREIGHT_PALLET_CUBIC_M3', '0.02')   # CalcLi
 def consolidate_lines(lines: list[FreightLine], tailgate: bool) -> ConsolidatedFreight:
     """Consolidate SKU/manual rows like CalcLines rows 12, 24 and 29.
 
-    English: Excel adds pallet tare weight/cubic when pallet count > 0.99.
-    Español: Excel suma peso/cubic de pallet cuando la cantidad de pallets supera 0.99.
+    Excel adds pallet tare weight/cubic when pallet count > 0.99.
     """
     quantity_total = Decimal('0')
     pallet_count = Decimal('0')

@@ -3,7 +3,7 @@ from apps.clients.models import Client
 
 
 class FromAddress(models.Model):
-    """Origin address configured by admin / Dirección FROM configurada por administrador."""
+    """Origin address configured through Django Admin."""
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='from_addresses')
     name = models.CharField(max_length=120)
     address_line_1 = models.CharField(max_length=180, blank=True)
@@ -23,7 +23,7 @@ class FromAddress(models.Model):
 
 
 class Suburb(models.Model):
-    """Australian suburb lookup / Equivalente a hoja SUBURBS."""
+    """Australian suburb lookup equivalent to the SUBURBS worksheet."""
     suburb_name = models.CharField(max_length=120)
     state = models.CharField(max_length=10)
     postcode = models.CharField(max_length=10)

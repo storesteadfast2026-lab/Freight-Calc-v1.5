@@ -57,7 +57,7 @@ class CalculatorAuthenticationForm(AuthenticationForm):
     )
 
     def confirm_login_allowed(self, user: Any) -> None:
-        """Reject all unauthorized states with the same visible message."""
+        """Reject all unauthorised states with the same visible message."""
         allowed, reason = self._has_calculator_entitlement(user)
         if allowed:
             return

@@ -23,8 +23,7 @@ def resolve_product(client: Client, sku: str) -> Product:
 def resolve_zone(client: Client, carrier_service, suburb: str, state: str, postcode: str | None) -> FreightZone | None:
     """Resolve zone similarly to ZONESUBURB / ZONECARRIER.
 
-    English: Prefer suburb+state because Excel often uses carrier/service + suburb + state.
-    Español: Se prioriza suburb+state porque Excel suele usar carrier/service + suburb + state.
+    Prefer suburb+state because Excel often uses carrier/service + suburb + state.
     """
     qs = FreightZone.objects.filter(client=client, carrier_service=carrier_service)
     zone = qs.filter(suburb__iexact=suburb, state__iexact=state).first()

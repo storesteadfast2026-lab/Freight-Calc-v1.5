@@ -79,7 +79,7 @@ def permission_denied_view(request, exception=None):
 
     Calculator pages return the approved login screen with an in-card message.
     API endpoints retain a JSON 403 response. Django Admin keeps Django's
-    default 403 behavior.
+    default 403 behaviour.
     """
 
     from django.contrib import messages

@@ -5,7 +5,7 @@ from apps.carriers.models import Carrier, CarrierService
 
 
 class FreightZone(models.Model):
-    """Zone mapping / Equivalente a hoja ZONES."""
+    """Zone mapping equivalent to the ZONES worksheet."""
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='zones')
     carrier_service = models.ForeignKey(CarrierService, on_delete=models.CASCADE)
     suburb = models.CharField(max_length=120)
@@ -32,7 +32,7 @@ class FreightZone(models.Model):
 
 
 class FreightRate(models.Model):
-    """Rate card row / Equivalente a hoja RATES."""
+    """Rate-card row equivalent to the RATES worksheet."""
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='rates')
     carrier_service = models.ForeignKey(CarrierService, on_delete=models.CASCADE)
     zone = models.CharField(max_length=40, blank=True)
@@ -69,7 +69,7 @@ class FreightRate(models.Model):
 
 
 class CarrierTailgateCharge(models.Model):
-    """Carrier tailgate table / Equivalente a SettingFlags!C33:H52."""
+    """Carrier tailgate table equivalent to SettingFlags!C33:H52."""
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='tailgate_charges')
     carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE)
     minimum_charge = models.DecimalField(max_digits=12, decimal_places=4, default=Decimal('0'))

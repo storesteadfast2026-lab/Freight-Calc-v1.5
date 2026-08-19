@@ -111,7 +111,7 @@ def _calculator_client_field():
 
 
 class PrimaryAccessFieldsMixin:
-    """Clear group-based access behavior shared by User add/change forms."""
+    """Clear group-based access behaviour shared by User add/change forms."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

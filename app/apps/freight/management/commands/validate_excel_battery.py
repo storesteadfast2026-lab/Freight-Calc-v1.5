@@ -87,7 +87,7 @@ def _rank(value) -> int:
 
 
 def _normalize_sku(value) -> str:
-    """Keep alphanumeric SKUs untouched, but normalize 20772.0 -> 20772."""
+    """Keep alphanumeric SKUs untouched, but normalise 20772.0 -> 20772."""
     sku = _text(value)
     if sku.endswith(".0") and sku[:-2].isdigit():
         return sku[:-2]
