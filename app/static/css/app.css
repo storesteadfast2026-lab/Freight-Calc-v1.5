@@ -230,7 +230,7 @@ label{position:relative}.dropdown{left:0;right:auto;top:100%;box-sizing:border-b
 .calculator-page .route-card h1{margin:0 0 16px 4px}
 .calculator-page .route-primary-grid{
   display:grid;
-  grid-template-columns:minmax(310px,1.35fr) minmax(80px,.35fr) minmax(260px,1fr) 72px 92px;
+  grid-template-columns:minmax(310px,1.35fr) minmax(80px,.35fr) minmax(340px,1.2fr);
   gap:12px;
   align-items:end;
 }
@@ -539,7 +539,7 @@ label{position:relative}.dropdown{left:0;right:auto;top:100%;box-sizing:border-b
 @media(max-width:1250px){
   .calculator-page .fc-workspace{grid-template-columns:minmax(0,1fr) 320px}
   .calculator-page .route-primary-grid{
-    grid-template-columns:minmax(280px,1.15fr) 65px minmax(235px,1fr) 68px 88px;
+    grid-template-columns:minmax(280px,1.15fr) 65px minmax(300px,1fr);
   }
   .calculator-page .products-table-wrap{overflow-x:auto;overflow-y:visible}
   .calculator-page .products-table{min-width:860px}
@@ -560,7 +560,7 @@ label{position:relative}.dropdown{left:0;right:auto;top:100%;box-sizing:border-b
   }
   .calculator-page .shipment-summary{position:static}
   .calculator-page .route-primary-grid{
-    grid-template-columns:minmax(260px,1fr) 70px minmax(240px,1fr) 75px 95px;
+    grid-template-columns:minmax(260px,1fr) 70px minmax(280px,1fr);
   }
 }
 

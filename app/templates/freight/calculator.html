@@ -81,17 +81,11 @@
                 <button type="button" class="combo-toggle" aria-label="Show suburbs" onclick="showSuburbOptions(true)">⌄</button>
                 <div id="suburb_results" class="dropdown"></div>
               </div>
+              <input id="destination_suburb" type="hidden">
+              <input id="state" type="hidden">
+              <input id="postcode" type="hidden">
             </label>
           </div>
-
-          <label class="route-compact-field">
-            <span class="field-label">State</span>
-            <input id="state" readonly>
-          </label>
-          <label class="route-compact-field">
-            <span class="field-label">Postcode</span>
-            <input id="postcode" readonly>
-          </label>
         </div>
 
         <div class="route-options-grid">
@@ -222,14 +216,37 @@ const PALLET_CUBIC_M3 = Number('{{ pallet_cubic_m3|default:"0.02" }}');
 function debounce(fn, ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 const suburbInput = document.getElementById('suburb_search');
 const suburbResults = document.getElementById('suburb_results');
-suburbInput.addEventListener('input', debounce(() => showSuburbOptions(false), 200));
+const destinationSuburbInput = document.getElementById('destination_suburb');
+const destinationStateInput = document.getElementById('state');
+const destinationPostcodeInput = document.getElementById('postcode');
+let selectedSuburbLabel = '';
+function clearDestinationSelection(){
+  destinationSuburbInput.value='';
+  destinationStateInput.value='';
+  destinationPostcodeInput.value='';
+  selectedSuburbLabel='';
+}
+const refreshSuburbOptions = debounce(() => showSuburbOptions(false), 200);
+suburbInput.addEventListener('input', () => {
+  if(suburbInput.value !== selectedSuburbLabel){ clearDestinationSelection(); }
+  refreshSuburbOptions();
+});
 async function showSuburbOptions(force=false){
-  const q = suburbInput.value.trim();
+  const q = destinationSuburbInput.value && suburbInput.value === selectedSuburbLabel
+    ? destinationSuburbInput.value
+    : suburbInput.value.trim();
   if(!force && q.length < 2){ suburbResults.innerHTML=''; return; }
   const res = await fetch(`/api/suburbs/?q=${encodeURIComponent(q)}`).then(r=>r.json());
   suburbResults.innerHTML = res.results.length ? res.results.map(s=>`<button type="button" onclick='pickSuburbObj(${JSON.stringify(s)})'>${s.label}</button>`).join('') : '<span class="no-results">No suburbs loaded or no matches found</span>';
 }
-function pickSuburbObj(s){suburbInput.value=s.suburb;document.getElementById('state').value=s.state;document.getElementById('postcode').value=s.postcode;suburbResults.innerHTML='';}
+function pickSuburbObj(s){
+  selectedSuburbLabel=s.label || `${s.suburb}, ${s.state} ${s.postcode}`;
+  suburbInput.value=selectedSuburbLabel;
+  destinationSuburbInput.value=s.suburb;
+  destinationStateInput.value=s.state;
+  destinationPostcodeInput.value=s.postcode;
+  suburbResults.innerHTML='';
+}
 function formatNumber(value, decimals=2){
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(decimals) : (0).toFixed(decimals);
@@ -357,12 +374,18 @@ async function calculate(){
     error.textContent=e.message;
     return;
   }
+  if(!destinationSuburbInput.value || !destinationStateInput.value || !destinationPostcodeInput.value){
+    status.textContent='';
+    error.textContent='Select a destination from the suburb list.';
+    suburbInput.focus();
+    return;
+  }
   status.textContent='Calculating freight...';
   button.disabled=true;
   try{
     const rows=[...document.querySelectorAll('#lines tbody tr')];
     const lines=rows.map(tr=>({sku:tr.querySelector('.sku').value,quantity:tr.querySelector('.qty').value,freight_type:tr.querySelector('.ftype').value,length_m:tr.querySelector('.len').value,width_m:tr.querySelector('.wid').value,height_m:tr.querySelector('.hei').value,weight_kg:tr.querySelector('.weight').value,cubic_m3:tr.querySelector('.cubic').value}));
-    const payload={client_code:CURRENT_CLIENT_CODE,from_address_id:document.getElementById('from_address_id').value||null,suburb:suburbInput.value,state:document.getElementById('state').value,postcode:document.getElementById('postcode').value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,cubic_margin_percent:cubicMargin,lines};
+    const payload={client_code:CURRENT_CLIENT_CODE,from_address_id:document.getElementById('from_address_id').value||null,suburb:destinationSuburbInput.value,state:destinationStateInput.value,postcode:destinationPostcodeInput.value,tailgate:document.getElementById('tailgate').value,preselect_sku:document.getElementById('preselect_sku').value,cubic_margin_percent:cubicMargin,lines};
     const resp=await fetch('/api/calculate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},credentials:'same-origin',body:JSON.stringify(payload)});
     
     let data;
