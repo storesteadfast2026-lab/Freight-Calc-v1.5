@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation
 import json
 
 from django.core.exceptions import PermissionDenied
+from django.conf import settings
 from django.db.models import Q
 from django.http import JsonResponse, HttpRequest
 from django.shortcuts import render
@@ -21,6 +22,7 @@ from .services.dtos import FreightRequest, FreightLine
 from .services.calculator import FreightCalculatorService
 from .services.validators import ValidationError
 from .services.consolidator import PALLET_WEIGHT_KG, PALLET_CUBIC_M3
+from apps.authentication_gateway.models import CalculatorUserProfile
 
 
 @ensure_csrf_cookie
@@ -46,6 +48,10 @@ def calculator_page(request: HttpRequest):
         'from_addresses': from_addresses,
         'pallet_weight_kg': PALLET_WEIGHT_KG,
         'pallet_cubic_m3': PALLET_CUBIC_M3,
+        'saved_estimates_enabled': settings.SAVED_ESTIMATES_ENABLED,
+        'can_export_estimates': (
+            profile.role == CalculatorUserProfile.Role.INTERNAL_USER
+        ),
     })
 
 

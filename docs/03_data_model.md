@@ -90,3 +90,16 @@ Valid combinations:
 | Internal User | Selected clients | Empty | One or more active clients |
 
 The database check constraint covers role, scope and single-client consistency. M2M and staff restrictions are validated by the Admin form and creation command.
+
+## Saved estimate snapshots — 2026-08-24
+
+`saved_estimates.SavedEstimate` is an isolated persistence model for verified calculator output. It does not replace `clients.FreightCalculator` and is not imported by the freight engine.
+
+```text
+Client 1 ─── N SavedEstimate
+auth.User 1 ─── N SavedEstimate
+```
+
+The record stores versioned `input_snapshot` and `result_snapshot` JSON documents plus indexed summary fields. Product, Carrier and Rate values are retained inside the snapshots so historical results do not change when operational master data changes.
+
+Customer visibility is restricted to the assigned Client and creating User. Internal visibility is restricted by the existing all/selected Client scope. See `docs/23_saved_estimates_module.md`.

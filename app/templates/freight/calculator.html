@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ client.code }} Freight Calculator</title>
   <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/saved_estimates/estimates.css">
 </head>
 <body class="calculator-page">
 <header class="fc-header">
@@ -14,6 +15,7 @@
       <span>Compare carrier rates in seconds</span>
     </div>
     <div class="fc-account">
+      {% include "saved_estimates/_header_link.html" %}
       <div class="fc-user">
         <span class="fc-user-icon" aria-hidden="true">●</span>
         <span>
@@ -138,6 +140,12 @@
             <h2>Available freight options</h2>
             <p>Carrier estimates for your shipment.</p>
           </div>
+          <div
+            {% if saved_estimates_enabled %}id="estimate_actions"{% endif %}
+            class="estimate-actions"
+          >
+            {% include "saved_estimates/_result_actions.html" %}
+          </div>
         </div>
         <div id="calc_status" class="status" aria-live="polite"></div>
         <div id="error" class="error" role="alert"></div>
@@ -197,7 +205,12 @@
         </label>
       </div>
 
-      <button type="button" class="primary calculate-button" onclick="calculate()">
+      <button
+        id="calculate_freight"
+        type="button"
+        class="primary calculate-button"
+        onclick="calculate()"
+      >
         Calculate freight
       </button>
 
@@ -310,7 +323,7 @@ function addLine(){
 function validateCubicMargin(){
   const input=document.getElementById('cubic_margin_percent');
   const resultsError=document.getElementById('error');
-  const calculateButton=document.querySelector('button.primary');
+  const calculateButton=document.getElementById('calculate_freight');
   const raw=input.value.trim();
   const value=Number(raw);
   const marginError='Cubic Margin must have a value between 0 and 20.';
@@ -363,9 +376,9 @@ async function calculate(){
   const status=document.getElementById('calc_status');
   const error=document.getElementById('error');
   const tbody=document.querySelector('#results tbody');
-  const button=document.querySelector('button.primary');
+  const button=document.getElementById('calculate_freight');
+  const resultsCard=tbody.closest('.results-card');
   error.textContent='';
-  tbody.innerHTML='';
   let cubicMargin;
   try{
     cubicMargin=getValidCubicMargin();
@@ -382,6 +395,8 @@ async function calculate(){
   }
   status.textContent='Calculating freight...';
   button.disabled=true;
+  resultsCard.classList.add('is-refreshing');
+  document.dispatchEvent(new CustomEvent('freight:calculation-started'));
   try{
     const rows=[...document.querySelectorAll('#lines tbody tr')];
     const lines=rows.map(tr=>({sku:tr.querySelector('.sku').value,quantity:tr.querySelector('.qty').value,freight_type:tr.querySelector('.ftype').value,length_m:tr.querySelector('.len').value,width_m:tr.querySelector('.wid').value,height_m:tr.querySelector('.hei').value,weight_kg:tr.querySelector('.weight').value,cubic_m3:tr.querySelector('.cubic').value}));
@@ -392,6 +407,7 @@ async function calculate(){
     try{ data=await resp.json(); } catch(e){ data={error:'The server did not return a valid JSON response.'}; }
     if(!resp.ok || data.error){
       status.textContent='';
+      tbody.innerHTML='';
       error.textContent=data.detail ? `${data.error}: ${data.detail}` : (data.error || `Calculation failed with HTTP ${resp.status}`);
       return;
     }
@@ -403,11 +419,15 @@ async function calculate(){
     }
     status.textContent=`${results.length} freight option(s) found.`;
     tbody.innerHTML=results.map((r,i)=>`<tr class="${i===0?'best':''}"><td>${r.carrier}</td><td>${r.service}</td><td>$${formatNumber(r.estimate_ex_gst)}</td></tr>`).join('');
+    document.dispatchEvent(new CustomEvent('freight:calculated',{detail:{payload,results}}));
   } catch(e){
     status.textContent='';
+    tbody.innerHTML='';
     error.textContent=`Unexpected browser-side error: ${e.message}`;
   } finally {
     button.disabled=false;
+    resultsCard.classList.remove('is-refreshing');
+    document.dispatchEvent(new CustomEvent('freight:calculation-finished'));
   }
 }
 function getCookie(name){return document.cookie.split('; ').find(row=>row.startsWith(name+'='))?.split('=')[1];}
@@ -418,5 +438,8 @@ document.addEventListener('click', (event) => {
 });
 addLine();
 </script>
+{% if saved_estimates_enabled %}
+  <script src="/static/saved_estimates/estimate_actions.js"></script>
+{% endif %}
 </body>
 </html>

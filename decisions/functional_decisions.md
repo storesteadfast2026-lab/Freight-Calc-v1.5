@@ -118,3 +118,12 @@
 - **Fallback:** Use `FUEL_SOURCE_URL` when the client has no successful fetched-Fuel history.
 - **Persistence:** Reuse `ExternalDataFile.source_url`; do not create a duplicate configuration table or migration.
 - **Boundary:** Product and Stock remain local uploads. Their filenames are recorded, but their local browser directory cannot be persisted or prefilled.
+
+## DEC-021 — Isolated saved freight estimates
+
+- **Status:** Accepted and implemented in source on 2026-08-24.
+- **Decision:** Persist verified freight-estimate snapshots in the separate `saved_estimates` app without changing the freight calculation engine.
+- **Verification:** Saving repeats the existing server calculation and rejects any mismatch with the displayed browser result.
+- **Visibility:** Customers see only estimates they created for their assigned Client. Internal Users see estimates for authorised Clients. CSV and Excel exports are Internal-User-only.
+- **Boundary:** Saved estimates are not binding quotations. Email, approval and quotation lifecycle remain excluded.
+- **Reversibility:** `SAVED_ESTIMATES_ENABLED=0` removes the feature UI and endpoints while leaving normal calculation available.

@@ -23,6 +23,8 @@ urlpatterns = [
     path('api/suburbs/', freight_views.suburb_autocomplete, name='suburb_autocomplete'),
     path('api/products/', freight_views.product_autocomplete, name='product_autocomplete'),
     path('api/calculate/', freight_views.calculate_freight, name='calculate_freight'),
+    path('estimates/', include('apps.saved_estimates.urls')),
+    path('api/estimates/', include('apps.saved_estimates.api_urls')),
 ]
 
 handler403 = "apps.authentication_gateway.views.permission_denied_view"

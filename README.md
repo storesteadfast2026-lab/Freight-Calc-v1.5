@@ -39,6 +39,18 @@ http://localhost:8000/
 http://localhost:8000/admin/
 ```
 
+## Saved estimates
+
+The isolated `apps.saved_estimates` module provides manual save, history, browser print/PDF, duplication and Internal-User CSV/Excel export. It verifies the displayed result by running the existing freight engine again before creating a snapshot.
+
+The calculation engine is unchanged. Disable the optional module with:
+
+```text
+SAVED_ESTIMATES_ENABLED=0
+```
+
+See `docs/23_saved_estimates_module.md` and ADR 0015.
+
 ## Create a superuser
 
 ```bash
@@ -99,6 +111,7 @@ Key documents:
 - `docs/19_documentation_status.md`: canonical map, included evidence and current outstanding items.
 - `docs/20_ai_project_continuation_prompt.md`: updated master prompt for continuing the project with AI. This is the only project document intentionally maintained in Spanish.
 - `docs/22_language_policy.md`: Australian English standard and the Spanish prompt exception.
+- `docs/23_saved_estimates_module.md`: isolated saved-estimate architecture, permissions and installation.
 - `business_rules/`: approved or proposed functional rules.
 - `decisions/`: functional decision record.
 - `docs/adr/`: permanent technical decisions.

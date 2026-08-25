@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'apps.audit',
     'apps.authentication_gateway.apps.AuthenticationGatewayConfig',
     'apps.freight',
+    'apps.saved_estimates.apps.SavedEstimatesConfig',
 ]
 
 MIDDLEWARE = [
@@ -104,5 +105,10 @@ FREIGHT_PALLET_CUBIC_M3 = os.getenv('FREIGHT_PALLET_CUBIC_M3', '0.02')
 FUEL_SOURCE_URL = os.getenv('FUEL_SOURCE_URL', 'https://www.poscat.com.au/fuelsc/fuel.csv')
 FUEL_FETCH_TIMEOUT_SECONDS = int(os.getenv('FUEL_FETCH_TIMEOUT_SECONDS', '30'))
 FUEL_RATE_MAX = os.getenv('FUEL_RATE_MAX', '1.0')
+
+# Optional, isolated persistence for verified freight calculation snapshots.
+# Disabling this flag hides the UI and blocks the saved-estimate endpoints
+# without changing the freight calculation engine or its API.
+SAVED_ESTIMATES_ENABLED = os.getenv('SAVED_ESTIMATES_ENABLED', '1') == '1'
 
 
