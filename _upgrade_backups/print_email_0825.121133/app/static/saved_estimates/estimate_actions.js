@@ -66,7 +66,7 @@
   document.addEventListener('freight:calculated', (event) => {
     lastCalculationPayload = event.detail.payload;
     lastCalculationResults = event.detail.results;
-    setStatus('Calculation completed. Save it before printing or emailing.', 'neutral');
+    setStatus('Calculation completed. Save it to print the current estimate.', 'neutral');
     markUnsaved();
   });
 
@@ -138,12 +138,16 @@
       if (!saved) {
         return;
       }
-      window.location.href = historyUrl();
+      window.location.href = savedEstimateCount > 1
+        ? historyUrl()
+        : saved.print_url;
       return;
     }
 
     if (savedUrls) {
-      window.location.href = historyUrl();
+      window.location.href = savedEstimateCount > 1
+        ? historyUrl()
+        : savedUrls.print_url;
       return;
     }
 

@@ -125,103 +125,8 @@
   color: #082a58;
 }
 
-.estimate-list-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.estimate-list-heading-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 .estimate-list-heading p {
   color: #59718e;
-}
-
-.estimate-email-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  margin: 12px 0 16px;
-  padding: 10px 12px;
-  border: 1px solid #dce5f1;
-  border-radius: 7px;
-  background: #f8fafc;
-  color: #46617f;
-}
-
-.estimate-email-controls label,
-.estimate-recipient-label {
-  color: #082a58;
-  font-weight: 700;
-}
-
-.estimate-email-controls select {
-  min-width: 280px;
-  min-height: 38px;
-  padding: 7px 10px;
-  border: 1px solid #bdcbe0;
-  border-radius: 6px;
-  background: #fff;
-  color: #132238;
-}
-
-#estimate-selection-count {
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.estimate-email-unavailable {
-  color: #9b3b32;
-}
-
-.estimate-messages {
-  margin: 8px 0 14px;
-}
-
-.estimate-message {
-  margin: 0 0 8px;
-  padding: 10px 12px;
-  border: 1px solid #dce5f1;
-  border-radius: 6px;
-  background: #f8fafc;
-}
-
-.estimate-message.success {
-  border-color: #9dd6b4;
-  background: #edf9f1;
-  color: #13703a;
-  font-weight: 700;
-}
-
-.estimate-message.error {
-  border-color: #e6b7b2;
-  background: #fff2f1;
-  color: #92372f;
-}
-
-.estimate-select-cell {
-  width: 38px;
-  text-align: center !important;
-}
-
-.estimate-select-cell input {
-  width: 17px;
-  height: 17px;
-  accent-color: #d49300;
-  cursor: pointer;
-}
-
-.estimate-select-cell input:disabled {
-  cursor: not-allowed;
-  opacity: 0.38;
 }
 
 .estimate-table-wrap {
@@ -348,26 +253,6 @@
 
   .estimate-summary-grid {
     grid-template-columns: 1fr;
-  }
-
-  .estimate-list-heading,
-  .estimate-email-controls {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .estimate-list-heading-actions {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .estimate-email-controls select {
-    min-width: 0;
-    width: 100%;
-  }
-
-  #estimate-selection-count {
-    margin-left: 0;
   }
 }
 
