@@ -33,5 +33,24 @@ services:
     depends_on:
       - db
 
+  ftp:
+    image: fauria/vsftpd
+    container_name: ftp_server
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - FTP_USER=steadfast
+      - FTP_PASS=steadfast
+      - PASV_ADDRESS=192.168.16.120
+      - PASV_MIN_PORT=21100
+      - PASV_MAX_PORT=21110
+    ports:
+      - "20:20"
+      - "21:21"
+      - "21100-21110:21100-21110"
+    volumes:
+      - ./uploaded_data:/home/vsftpd/steadfast
+      
 volumes:
   postgres_data:

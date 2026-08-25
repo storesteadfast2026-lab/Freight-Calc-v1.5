@@ -1,584 +1,446 @@
-﻿<#
+<#
 .SYNOPSIS
-  Creates a safe, complete ZIP for reviewing the current STH Freight Calculator code with AI.
+  Creates a production deployment package or a restorable full backup.
 
 .DESCRIPTION
-  Corrected version: uses valid PowerShell `elseif` syntax in the diagnostics block.
+  Deployment mode contains application source, Docker build files, migrations,
+  controlled reference data, production examples, diagnostics, and manifests.
 
-  Run this script from the root of the Django project, for example:
-
-    C:\Docker-Projects\Freight-Calc-Nuevo
-
-  The package includes:
-    - Django/Python code, templates, JavaScript, CSS, migrations and tests.
-    - Docker configuration and installation files available at the project root.
-    - Documentation and reports unless -SkipReports is specified.
-    - Known reference Excel files, if available, unless -SkipReferenceFiles is specified.
-    - Project tree, Git status, Django check, migrations, non-sensitive database summary and test results.
-
-  The package excludes:
-    - Virtual environments, caches, .git, node_modules and generated files.
-    - Real .env files, credentials, certificates, private keys and database dumps.
-    - media, uploaded_data, staticfiles, logs and earlier ZIP files.
-    - A complete PostgreSQL backup.
-
-  Excel file inclusion is controlled: only the three known reference files are searched for.
+  FullBackup mode additionally captures PostgreSQL and persistent uploaded files.
+  It fails if the database dump cannot be created unless -AllowIncompleteBackup
+  is explicitly supplied. Secrets are never included unless
+  -IncludeEnvironmentFile is explicitly supplied.
 
 .EXAMPLE
-  .\Create_Files_Review_zip.ps1
+  .\Create_Files_Review_zip.ps1 -PackageMode Deployment
 
 .EXAMPLE
-  .\Create_Files_Review_zip.ps1 -SkipTests
+  .\Create_Files_Review_zip.ps1 -PackageMode FullBackup
 
 .EXAMPLE
-  .\Create_Files_Review_zip.ps1 -SkipReferenceFiles -SkipReports
+  .\Create_Files_Review_zip.ps1 -PackageMode FullBackup -IncludeEnvironmentFile
 #>
 
 [CmdletBinding()]
 param(
-    [string]$OutputZip = ("Create_Files_review_{0}.zip" -f (Get-Date -Format "MMdd.HHmm")),
-    [string]$WorkDir = ("_upload_review_{0}" -f (Get-Date -Format "MMdd.HHmm")),
+    [ValidateSet("Deployment", "FullBackup")]
+    [string]$PackageMode = "Deployment",
+    [string]$ProjectRoot = $PSScriptRoot,
+    [string]$OutputZip = "",
+    [string]$WorkDir = "",
     [switch]$SkipReferenceFiles,
     [switch]$SkipReports,
     [switch]$SkipRuntimeDiagnostics,
     [switch]$SkipTests,
+    [switch]$SkipDatabaseBackup,
+    [switch]$SkipUploadedData,
+    [switch]$IncludeEnvironmentFile,
+    [switch]$AllowIncompleteBackup,
     [switch]$KeepWorkDir
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 2.0
 
-$ProjectRoot = (Get-Location).Path
+$ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
+$stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$modeSlug = $PackageMode.ToLowerInvariant()
+if (!$OutputZip) { $OutputZip = "Freight_Calc_${modeSlug}_${stamp}.zip" }
+if (!$WorkDir) { $WorkDir = "_package_${modeSlug}_${stamp}" }
 $WorkPath = Join-Path $ProjectRoot $WorkDir
+$ZipPath = if ([IO.Path]::IsPathRooted($OutputZip)) { $OutputZip } else { Join-Path $ProjectRoot $OutputZip }
+if ([IO.Path]::GetExtension($ZipPath) -ne ".zip") { $ZipPath = "$ZipPath.zip" }
 
-if ([System.IO.Path]::IsPathRooted($OutputZip)) {
-    $ZipPath = $OutputZip
+if (!(Test-Path -LiteralPath (Join-Path $ProjectRoot "app\manage.py") -PathType Leaf)) {
+    throw "app\manage.py was not found. Use -ProjectRoot to select the Freight Calculator project root."
 }
-else {
-    $ZipPath = Join-Path $ProjectRoot $OutputZip
+if ($IncludeEnvironmentFile -and $PackageMode -ne "FullBackup") {
+    throw "-IncludeEnvironmentFile is allowed only with -PackageMode FullBackup."
 }
-
-if ([System.IO.Path]::GetExtension($ZipPath) -ne ".zip") {
-    $ZipPath = "$ZipPath.zip"
-}
-
-$ZipParent = Split-Path -Parent $ZipPath
-if ($ZipParent -and !(Test-Path $ZipParent)) {
-    New-Item -ItemType Directory -Path $ZipParent -Force | Out-Null
+if ((Resolve-Path -LiteralPath (Split-Path -Parent $WorkPath) -ErrorAction SilentlyContinue) -eq $null) {
+    throw "The work directory parent does not exist: $(Split-Path -Parent $WorkPath)"
 }
 
-$ExcludedLog = New-Object System.Collections.Generic.List[string]
-$ReferenceLog = New-Object System.Collections.Generic.List[string]
+$ExcludedLog = [Collections.Generic.List[string]]::new()
+$Warnings = [Collections.Generic.List[string]]::new()
+$IncludedLog = [Collections.Generic.List[string]]::new()
 
-function Write-Section {
-    param([string]$Text)
+function Write-Section([string]$Text) {
     Write-Host ""
     Write-Host $Text -ForegroundColor Cyan
 }
 
-function Add-ExcludedItem {
-    param(
-        [string]$Path,
-        [string]$Reason
-    )
-
-    $relative = $Path
-    if ($Path.StartsWith($WorkPath, [System.StringComparison]::OrdinalIgnoreCase)) {
-        $relative = $Path.Substring($WorkPath.Length).TrimStart([char[]]'\/')
-    }
-
-    $ExcludedLog.Add("$relative`t$Reason") | Out-Null
+function Get-RelativePath([string]$Base, [string]$Path) {
+    return [IO.Path]::GetRelativePath($Base, $Path)
 }
 
-function Remove-TrackedItem {
-    param(
-        [System.IO.FileSystemInfo]$Item,
-        [string]$Reason
-    )
+function Copy-PackageItem([string]$RelativePath, [switch]$Optional) {
+    $source = Join-Path $ProjectRoot $RelativePath
+    if (!(Test-Path -LiteralPath $source)) {
+        if (!$Optional) { $Warnings.Add("Required path not found: $RelativePath") | Out-Null }
+        return
+    }
+    $destination = Join-Path $WorkPath $RelativePath
+    $parent = Split-Path -Parent $destination
+    if ($parent) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+    Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
+    $IncludedLog.Add($RelativePath) | Out-Null
+}
 
-    Add-ExcludedItem -Path $Item.FullName -Reason $Reason
+function Remove-PackageItem([IO.FileSystemInfo]$Item, [string]$Reason) {
+    $relative = Get-RelativePath $WorkPath $Item.FullName
+    $ExcludedLog.Add("$relative`t$Reason") | Out-Null
     Remove-Item -LiteralPath $Item.FullName -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-function Copy-RootMatches {
-    param([string[]]$Patterns)
-
-    foreach ($pattern in $Patterns) {
-        Get-ChildItem -Path $ProjectRoot -File -Force -Filter $pattern -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.FullName -ne $ZipPath -and
-                !$_.FullName.StartsWith($WorkPath, [System.StringComparison]::OrdinalIgnoreCase)
-            } |
-            ForEach-Object {
-                Write-Host "Copying root file: $($_.Name)" -ForegroundColor Green
-                Copy-Item -LiteralPath $_.FullName -Destination $WorkPath -Force
-            }
-    }
-}
-
 function Invoke-CommandToFile {
-    param(
-        [string]$Executable,
-        [string[]]$Arguments,
-        [string]$OutputFile,
-        [string]$Title
-    )
-
+    param([string]$Executable, [string[]]$Arguments, [string]$OutputFile, [string]$Title)
     $target = Join-Path $WorkPath $OutputFile
-    "# $Title" | Out-File -FilePath $target -Encoding utf8
-    "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')" | Out-File -FilePath $target -Append -Encoding utf8
-    "Command: $Executable $($Arguments -join ' ')" | Out-File -FilePath $target -Append -Encoding utf8
-    "" | Out-File -FilePath $target -Append -Encoding utf8
-
+    "# $Title" | Out-File -LiteralPath $target -Encoding utf8
+    "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')" | Out-File -LiteralPath $target -Append -Encoding utf8
+    "Command: $Executable $($Arguments -join ' ')" | Out-File -LiteralPath $target -Append -Encoding utf8
+    "" | Out-File -LiteralPath $target -Append -Encoding utf8
     try {
         $output = & $Executable @Arguments 2>&1
         $exitCode = $LASTEXITCODE
-        $output | Out-File -FilePath $target -Append -Encoding utf8
-        "" | Out-File -FilePath $target -Append -Encoding utf8
-        "Exit code: $exitCode" | Out-File -FilePath $target -Append -Encoding utf8
+        $output | Out-File -LiteralPath $target -Append -Encoding utf8
+        "`nExit code: $exitCode" | Out-File -LiteralPath $target -Append -Encoding utf8
         return $exitCode
     }
     catch {
-        "FAILED TO EXECUTE: $($_.Exception.Message)" | Out-File -FilePath $target -Append -Encoding utf8
+        "FAILED TO EXECUTE: $($_.Exception.Message)" | Out-File -LiteralPath $target -Append -Encoding utf8
         return 999
     }
 }
 
-function Find-ReferenceFile {
-    param(
-        [string]$FileName,
-        [string[]]$PreferredPaths
-    )
-
-    foreach ($candidate in $PreferredPaths) {
-        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-            return (Resolve-Path -LiteralPath $candidate).Path
-        }
+function Test-DockerService([string]$Service) {
+    if (!(Get-Command docker -ErrorAction SilentlyContinue)) { return $false }
+    try {
+        $services = @(& docker compose --project-directory $ProjectRoot ps --status running --services 2>$null)
+        return ($LASTEXITCODE -eq 0 -and $services -contains $Service)
     }
-
-    $found = Get-ChildItem -Path $ProjectRoot -Recurse -File -Force -Filter $FileName -ErrorAction SilentlyContinue |
-        Where-Object {
-            !$_.FullName.StartsWith($WorkPath, [System.StringComparison]::OrdinalIgnoreCase) -and
-            $_.FullName -ne $ZipPath
-        } |
-        Select-Object -First 1
-
-    if ($found) {
-        return $found.FullName
-    }
-
-    return $null
+    catch { return $false }
 }
 
-Write-Host "STH Freight Calculator - AI review ZIP builder" -ForegroundColor Cyan
+function New-DatabaseBackup {
+    $databaseDir = Join-Path $WorkPath "backup\database"
+    New-Item -ItemType Directory -Path $databaseDir -Force | Out-Null
+    $dumpPath = Join-Path $databaseDir "postgres.dump"
+    $metadataPath = Join-Path $databaseDir "DATABASE_BACKUP.txt"
+    $containerDump = "/tmp/freight_calc_${stamp}.dump"
+    try {
+        if (!(Test-DockerService "db")) { throw "Docker Compose service 'db' is not running." }
+        & docker compose --project-directory $ProjectRoot exec -T db sh -c "pg_dump -U `"`$POSTGRES_USER`" -d `"`$POSTGRES_DB`" -Fc -f '$containerDump'"
+        if ($LASTEXITCODE -ne 0) { throw "pg_dump failed with exit code $LASTEXITCODE." }
+        & docker compose --project-directory $ProjectRoot cp "db:$containerDump" $dumpPath
+        if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $dumpPath)) { throw "The database dump could not be copied from the container." }
+        & docker compose --project-directory $ProjectRoot exec -T db rm -f $containerDump 2>$null | Out-Null
+        $hash = (Get-FileHash -LiteralPath $dumpPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        @(
+            "Format: PostgreSQL custom archive (-Fc)",
+            "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')",
+            "SizeBytes: $((Get-Item -LiteralPath $dumpPath).Length)",
+            "SHA256: $hash",
+            "Restore with pg_restore as documented in INSTALL_AND_RESTORE.md."
+        ) | Out-File -LiteralPath $metadataPath -Encoding utf8
+    }
+    catch {
+        if (Get-Command docker -ErrorAction SilentlyContinue) {
+            & docker compose --project-directory $ProjectRoot exec -T db rm -f $containerDump 2>$null | Out-Null
+        }
+        $message = "Database backup failed: $($_.Exception.Message)"
+        $Warnings.Add($message) | Out-Null
+        $message | Out-File -LiteralPath $metadataPath -Encoding utf8
+        if (!$AllowIncompleteBackup) { throw "$message Use -AllowIncompleteBackup only if an incomplete package is intentional." }
+    }
+}
+
+Write-Host "STH Freight Calculator package builder" -ForegroundColor Cyan
+Write-Host "Mode:         $PackageMode" -ForegroundColor Gray
 Write-Host "Project root: $ProjectRoot" -ForegroundColor Gray
 Write-Host "Output ZIP:   $ZipPath" -ForegroundColor Gray
 
-if (!(Test-Path (Join-Path $ProjectRoot "app") -PathType Container)) {
-    throw "No se encontro la carpeta .\app. Ejecuta el script desde la raiz del proyecto Django."
-}
-
-if (!(Test-Path (Join-Path $ProjectRoot "manage.py") -PathType Leaf) -and
-    !(Test-Path (Join-Path $ProjectRoot "app\manage.py") -PathType Leaf)) {
-    Write-Warning "No se encontro manage.py en la raiz ni en .\app. El codigo se empaquetara, pero no se podran ejecutar diagnosticos locales."
-}
-
-Write-Section "1. Preparing temporary review directory"
-
+Write-Section "1. Preparing isolated package directory"
 if (Test-Path -LiteralPath $WorkPath) {
-    Write-Host "Removing previous work directory: $WorkPath" -ForegroundColor Yellow
-    Remove-Item -LiteralPath $WorkPath -Recurse -Force
+    $resolvedWork = (Resolve-Path -LiteralPath $WorkPath).Path
+    if (!$resolvedWork.StartsWith($ProjectRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove a work directory outside the project root: $resolvedWork"
+    }
+    Remove-Item -LiteralPath $resolvedWork -Recurse -Force
 }
-
 New-Item -ItemType Directory -Path $WorkPath -Force | Out-Null
+New-Item -ItemType Directory -Path (Split-Path -Parent $ZipPath) -Force | Out-Null
 
-Write-Section "2. Copying source code and documentation"
+Write-Section "2. Copying application and deployment sources"
+@(
+    "app", "docker", "tools", "docs", "business_rules", "decisions",
+    "scripts", "tests", "requirements.txt", "README.md", ".gitignore",
+    ".dockerignore", ".env.example", "docker-compose.yml", "docker-compose.yaml",
+    "compose.yml", "compose.yaml", "pyproject.toml", "pytest.ini", "gunicorn.conf.py",
+    "INSTALLATION_README_0819.1336.md"
+) | ForEach-Object { Copy-PackageItem $_ -Optional }
 
-$folders = @("app", "tools", "docs", "business_rules", "decisions", "scripts", "tests")
-if (!$SkipReports) {
-    $folders += "reports"
+Get-ChildItem -LiteralPath $ProjectRoot -File -Filter "*.ps1" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -ne $ZipPath } |
+    ForEach-Object { Copy-PackageItem $_.Name -Optional }
+
+if (!$SkipReports) { Copy-PackageItem "reports" -Optional }
+
+Write-Section "3. Copying controlled installation data"
+if (!$SkipReferenceFiles) {
+    @(
+        "sample_data\V2026.R2_Unlocked_STH_Freight_Calculator.xlsx",
+        "sample_data\product_sth.xlsx",
+        "sample_data\stock_sth.xlsx",
+        "sample_data\live_baselines"
+    ) | ForEach-Object { Copy-PackageItem $_ -Optional }
+}
+else {
+    $Warnings.Add("Reference data was skipped; automatic initial data import will not be available.") | Out-Null
 }
 
-foreach ($folder in $folders) {
-    $source = Join-Path $ProjectRoot $folder
-    if (Test-Path -LiteralPath $source -PathType Container) {
-        Write-Host "Copying folder: $folder" -ForegroundColor Green
-        Copy-Item -LiteralPath $source -Destination (Join-Path $WorkPath $folder) -Recurse -Force
+Write-Section "4. Capturing persistent application state"
+if ($PackageMode -eq "FullBackup") {
+    if (!$SkipUploadedData) {
+        Copy-PackageItem "uploaded_data" -Optional
+        if (!(Test-Path -LiteralPath (Join-Path $WorkPath "uploaded_data"))) {
+            New-Item -ItemType Directory -Path (Join-Path $WorkPath "uploaded_data") -Force | Out-Null
+        }
+    }
+    else { $Warnings.Add("Persistent uploaded_data was skipped.") | Out-Null }
+
+    if (!$SkipDatabaseBackup) { New-DatabaseBackup }
+    else { $Warnings.Add("PostgreSQL backup was skipped.") | Out-Null }
+
+    if ($IncludeEnvironmentFile) {
+        $environmentSource = Join-Path $ProjectRoot ".env"
+        if (!(Test-Path -LiteralPath $environmentSource -PathType Leaf)) {
+            if (!$AllowIncompleteBackup) { throw "-IncludeEnvironmentFile was requested but .env was not found." }
+            $Warnings.Add(".env was requested but not found.") | Out-Null
+        }
+        else {
+            New-Item -ItemType Directory -Path (Join-Path $WorkPath "backup\private") -Force | Out-Null
+            Copy-Item -LiteralPath $environmentSource -Destination (Join-Path $WorkPath "backup\private\.env") -Force
+            "WARNING: This directory contains production secrets. Store and transmit the ZIP securely." |
+                Out-File -LiteralPath (Join-Path $WorkPath "backup\private\SENSITIVE.txt") -Encoding utf8
+        }
     }
 }
 
-$rootPatterns = @(
-    "docker-compose*.yml",
-    "docker-compose*.yaml",
-    "compose*.yml",
-    "compose*.yaml",
-    "Dockerfile*",
-    "requirements*.txt",
-    "manage.py",
-    "README*",
-    ".env*.example",
-    ".gitignore",
-    ".dockerignore",
-    "pyproject.toml",
-    "pytest.ini",
-    "tox.ini",
-    "gunicorn*.py",
-    "Makefile",
-    "*.ps1"
-)
-Copy-RootMatches -Patterns $rootPatterns
-
-Write-Section "3. Removing generated, heavy, and sensitive content"
-
+Write-Section "5. Removing generated and unsafe source artefacts"
 $removeDirectoryNames = @(
-    ".venv", "venv", "env",
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".coverage",
-    ".git", ".idea", ".vscode", "node_modules",
-    "staticfiles", "media", "uploaded_data", "uploads",
-    "htmlcov", "coverage", "dist", "build"
+    ".git", ".venv", "venv", "env", "__pycache__", ".pytest_cache", ".mypy_cache",
+    ".ruff_cache", "node_modules", "staticfiles", "htmlcov", "coverage", "dist", "build"
 )
-
-$directoriesToRemove = Get-ChildItem -Path $WorkPath -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+Get-ChildItem -LiteralPath $WorkPath -Recurse -Directory -Force -ErrorAction SilentlyContinue |
     Where-Object { $removeDirectoryNames -contains $_.Name } |
-    Sort-Object { $_.FullName.Length } -Descending
+    Sort-Object { $_.FullName.Length } -Descending |
+    ForEach-Object { if (Test-Path -LiteralPath $_.FullName) { Remove-PackageItem $_ "Generated or local directory" } }
 
-foreach ($directory in $directoriesToRemove) {
-    if (Test-Path -LiteralPath $directory.FullName) {
-        Write-Host "Removing folder: $($directory.FullName)" -ForegroundColor DarkYellow
-        Remove-TrackedItem -Item $directory -Reason "Generated, local, uploaded, or unnecessary directory"
-    }
-}
-
-$removeExtensions = @(
-    ".pyc", ".pyo",
-    ".sqlite3", ".db", ".dump", ".sql",
-    ".log",
-    ".zip", ".7z", ".rar",
-    ".pem", ".key", ".pfx", ".p12", ".jks",
-    ".bak", ".tmp", ".swp",
-    ".xlsx", ".xlsm", ".xls"
-)
-
-$filesToRemove = Get-ChildItem -Path $WorkPath -Recurse -File -Force -ErrorAction SilentlyContinue |
-    Where-Object { $removeExtensions -contains $_.Extension.ToLowerInvariant() }
-
-foreach ($file in $filesToRemove) {
-    Write-Host "Removing file: $($file.FullName)" -ForegroundColor DarkYellow
-    Remove-TrackedItem -Item $file -Reason "Binary, generated, database, secret, backup, archive, or non-controlled spreadsheet"
-}
-
-$backupNamedFiles = Get-ChildItem -Path $WorkPath -Recurse -File -Force -ErrorAction SilentlyContinue |
+$removeExtensions = @(".pyc", ".pyo", ".sqlite3", ".db", ".log", ".zip", ".7z", ".rar", ".pem", ".key", ".pfx", ".p12", ".jks", ".bak", ".tmp", ".swp")
+Get-ChildItem -LiteralPath $WorkPath -Recurse -File -Force -ErrorAction SilentlyContinue |
     Where-Object {
-        $_.Name -match '\.bak($|[._-])' -or
-        $_.Name -match '^backup[._-]' -or
-        $_.Name -match '[._-]backup[._-]'
-    }
+        ($removeExtensions -contains $_.Extension.ToLowerInvariant()) -or
+        $_.Name.StartsWith("~$") -or
+        $_.Name -match '\.bak($|[._-])'
+    } |
+    ForEach-Object { Remove-PackageItem $_ "Generated, secret, archive, temporary, or backup file" }
 
-foreach ($file in $backupNamedFiles) {
-    if (Test-Path -LiteralPath $file.FullName) {
-        Write-Host "Removing backup-named file: $($file.FullName)" -ForegroundColor DarkYellow
-        Remove-TrackedItem -Item $file -Reason "Local backup file"
-    }
-}
-
-$sensitiveFiles = Get-ChildItem -Path $WorkPath -Recurse -File -Force -ErrorAction SilentlyContinue |
+Get-ChildItem -LiteralPath $WorkPath -Recurse -File -Force -ErrorAction SilentlyContinue |
     Where-Object {
         $name = $_.Name.ToLowerInvariant()
-        (($name -like ".env*") -and ($name -notlike "*.example")) -or
-        ($name -match "^(credentials?|secrets?|private[_-]?key).*") -or
-        ($name -match ".*\.(kdbx|ovpn)$")
-    }
-
-foreach ($file in $sensitiveFiles) {
-    Write-Host "Removing sensitive file: $($file.FullName)" -ForegroundColor Red
-    Remove-TrackedItem -Item $file -Reason "Potential secret or credential file"
-}
-
-Write-Section "4. Adding controlled Excel reference files"
-
-$referenceDir = Join-Path $WorkPath "reference_files"
-
-if (!$SkipReferenceFiles) {
-    New-Item -ItemType Directory -Path $referenceDir -Force | Out-Null
-
-    $referenceSpecs = @(
-        @{
-            Name = "V2026.R2_Unlocked_STH_Freight_Calculator.xlsx"
-            Paths = @(
-                (Join-Path $ProjectRoot "sample_data\V2026.R2_Unlocked_STH_Freight_Calculator.xlsx"),
-                (Join-Path $ProjectRoot "app\sample_data\V2026.R2_Unlocked_STH_Freight_Calculator.xlsx"),
-                (Join-Path $ProjectRoot "V2026.R2_Unlocked_STH_Freight_Calculator.xlsx")
-            )
-        },
-        @{
-            Name = "product_sth.xlsx"
-            Paths = @(
-                "T:\Steadfast\Excel Files\STH_FGT_CALC\product_sth.xlsx",
-                (Join-Path $ProjectRoot "sample_data\product_sth.xlsx"),
-                (Join-Path $ProjectRoot "app\sample_data\product_sth.xlsx"),
-                (Join-Path $ProjectRoot "product_sth.xlsx")
-            )
-        },
-        @{
-            Name = "stock_sth.xlsx"
-            Paths = @(
-                "T:\Steadfast\Excel Files\STH_FGT_CALC\stock_sth.xlsx",
-                (Join-Path $ProjectRoot "sample_data\stock_sth.xlsx"),
-                (Join-Path $ProjectRoot "app\sample_data\stock_sth.xlsx"),
-                (Join-Path $ProjectRoot "stock_sth.xlsx")
-            )
-        }
-    )
-
-    foreach ($spec in $referenceSpecs) {
-        $sourceFile = Find-ReferenceFile -FileName $spec.Name -PreferredPaths $spec.Paths
-        if ($sourceFile) {
-            $destination = Join-Path $referenceDir $spec.Name
-            Copy-Item -LiteralPath $sourceFile -Destination $destination -Force
-            $hash = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
-            $ReferenceLog.Add("INCLUDED`t$($spec.Name)`t$sourceFile`tSHA256=$hash") | Out-Null
-            Write-Host "Included reference file: $($spec.Name)" -ForegroundColor Green
-        }
-        else {
-            $ReferenceLog.Add("NOT FOUND`t$($spec.Name)") | Out-Null
-            Write-Warning "Reference file not found: $($spec.Name)"
-        }
-    }
-
-    if (@(Get-ChildItem -Path $referenceDir -File -ErrorAction SilentlyContinue).Count -eq 0) {
-        Remove-Item -LiteralPath $referenceDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
-else {
-    $ReferenceLog.Add("SKIPPED BY PARAMETER`tAll reference spreadsheets") | Out-Null
-}
-
-$ReferenceLog | Out-File -FilePath (Join-Path $WorkPath "REFERENCE_FILES.txt") -Encoding utf8
-
-Write-Section "5. Capturing Git state"
-
-$gitFile = Join-Path $WorkPath "GIT_STATE.txt"
-$gitCommand = Get-Command git -ErrorAction SilentlyContinue
-
-if ($gitCommand) {
-    "# Git state" | Out-File -FilePath $gitFile -Encoding utf8
-    "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')" | Out-File -FilePath $gitFile -Append -Encoding utf8
-
-    $branch = & git -C $ProjectRoot branch --show-current 2>&1
-    $commit = & git -C $ProjectRoot rev-parse HEAD 2>&1
-    $lastCommit = & git -C $ProjectRoot log -1 --format="%h | %ad | %an | %s" --date=iso-strict 2>&1
-    $status = & git -C $ProjectRoot status --short 2>&1
-
-    "Branch: $branch" | Out-File -FilePath $gitFile -Append -Encoding utf8
-    "Commit: $commit" | Out-File -FilePath $gitFile -Append -Encoding utf8
-    "Last commit: $lastCommit" | Out-File -FilePath $gitFile -Append -Encoding utf8
-    "" | Out-File -FilePath $gitFile -Append -Encoding utf8
-    "Modified/untracked files:" | Out-File -FilePath $gitFile -Append -Encoding utf8
-    if ($status) {
-        $status | Out-File -FilePath $gitFile -Append -Encoding utf8
-    }
-    else {
-        "Working tree clean" | Out-File -FilePath $gitFile -Append -Encoding utf8
-    }
-}
-else {
-    "Git is not available. Git metadata was not collected." | Out-File -FilePath $gitFile -Encoding utf8
-}
-
-Write-Section "6. Capturing Django/runtime diagnostics"
-
-$diagnosticMode = "none"
-$dockerAvailable = [bool](Get-Command docker -ErrorAction SilentlyContinue)
-$webRunning = $false
-
-if (!$SkipRuntimeDiagnostics -and $dockerAvailable) {
-    try {
-        $runningServices = @(& docker compose ps --status running --services 2>$null)
-        if ($LASTEXITCODE -eq 0 -and ($runningServices -contains "web")) {
-            $webRunning = $true
-            $diagnosticMode = "docker"
-        }
-    }
-    catch {
-        $webRunning = $false
-    }
-}
-
-$localPython = Get-Command python -ErrorAction SilentlyContinue
-$managePath = $null
-if (Test-Path (Join-Path $ProjectRoot "manage.py") -PathType Leaf) {
-    $managePath = "manage.py"
-}
-elseif (Test-Path (Join-Path $ProjectRoot "app\manage.py") -PathType Leaf) {
-    $managePath = "app/manage.py"
-}
-
-if (!$SkipRuntimeDiagnostics -and !$webRunning -and $localPython -and $managePath) {
-    $diagnosticMode = "local"
-}
-
-if ($SkipRuntimeDiagnostics) {
-    "Runtime diagnostics were skipped by parameter." | Out-File -FilePath (Join-Path $WorkPath "RUNTIME_DIAGNOSTICS.txt") -Encoding utf8
-}
-elseif ($diagnosticMode -eq "docker") {
-    Write-Host "Using running Docker service: web" -ForegroundColor Green
-
-    Invoke-CommandToFile -Executable "docker" -Arguments @("compose", "exec", "-T", "web", "python", "manage.py", "check") -OutputFile "DJANGO_CHECK.txt" -Title "Django system check" | Out-Null
-    Invoke-CommandToFile -Executable "docker" -Arguments @("compose", "exec", "-T", "web", "python", "manage.py", "showmigrations") -OutputFile "MIGRATIONS_STATUS.txt" -Title "Applied Django migrations" | Out-Null
-
-    $dbSummaryCode = @'
-from django.apps import apps
-
-specs = [
-    ("clients", "Client"),
-    ("products", "Product"),
-    ("locations", "Suburb"),
-    ("rates", "FreightZone"),
-    ("rates", "FreightRate"),
-    ("carriers", "ClientCarrierConfig"),
-    ("imports", "ExternalDataFile"),
-    ("imports", "ProductSourceRow"),
-    ("imports", "StockSourceRow"),
-    ("audit", "AuditEvent"),
-]
-
-print("NON-SENSITIVE DATABASE SUMMARY")
-for app_label, model_name in specs:
-    try:
-        model = apps.get_model(app_label, model_name)
-        print(f"{app_label}.{model_name}: {model.objects.count()}")
-    except Exception as exc:
-        print(f"{app_label}.{model_name}: unavailable ({exc.__class__.__name__})")
-
-try:
-    Client = apps.get_model("clients", "Client")
-    print("Client codes:", ", ".join(Client.objects.order_by("code").values_list("code", flat=True)))
-except Exception as exc:
-    print("Client codes: unavailable", exc.__class__.__name__)
-'@
-
-    Invoke-CommandToFile -Executable "docker" -Arguments @("compose", "exec", "-T", "web", "python", "manage.py", "shell", "-c", $dbSummaryCode) -OutputFile "DATABASE_SUMMARY.txt" -Title "Non-sensitive database row counts" | Out-Null
-
-    if (!$SkipTests) {
-        Invoke-CommandToFile -Executable "docker" -Arguments @("compose", "exec", "-T", "web", "python", "manage.py", "test", "-v", "2") -OutputFile "TEST_RESULTS.txt" -Title "Complete Django test suite" | Out-Null
-    }
-    else {
-        "Tests were skipped by parameter." | Out-File -FilePath (Join-Path $WorkPath "TEST_RESULTS.txt") -Encoding utf8
-    }
-}
-elseif ($diagnosticMode -eq "local") {
-    Write-Host "Docker web service not available. Using local Python." -ForegroundColor Yellow
-
-    Invoke-CommandToFile -Executable $localPython.Path -Arguments @($managePath, "check") -OutputFile "DJANGO_CHECK.txt" -Title "Django system check" | Out-Null
-    Invoke-CommandToFile -Executable $localPython.Path -Arguments @($managePath, "showmigrations") -OutputFile "MIGRATIONS_STATUS.txt" -Title "Applied Django migrations" | Out-Null
-
-    "Database summary was not collected automatically in local mode." | Out-File -FilePath (Join-Path $WorkPath "DATABASE_SUMMARY.txt") -Encoding utf8
-
-    if (!$SkipTests) {
-        Invoke-CommandToFile -Executable $localPython.Path -Arguments @($managePath, "test", "-v", "2") -OutputFile "TEST_RESULTS.txt" -Title "Complete Django test suite" | Out-Null
-    }
-    else {
-        "Tests were skipped by parameter." | Out-File -FilePath (Join-Path $WorkPath "TEST_RESULTS.txt") -Encoding utf8
-    }
-}
-else {
-    $message = @"
-Runtime diagnostics could not be collected.
-Docker service 'web' was not running and no usable local Python/manage.py combination was found.
-The source package is still valid for static code review.
-"@
-    $message | Out-File -FilePath (Join-Path $WorkPath "RUNTIME_DIAGNOSTICS.txt") -Encoding utf8
-    $message | Out-File -FilePath (Join-Path $WorkPath "DJANGO_CHECK.txt") -Encoding utf8
-    $message | Out-File -FilePath (Join-Path $WorkPath "MIGRATIONS_STATUS.txt") -Encoding utf8
-    $message | Out-File -FilePath (Join-Path $WorkPath "DATABASE_SUMMARY.txt") -Encoding utf8
-    $message | Out-File -FilePath (Join-Path $WorkPath "TEST_RESULTS.txt") -Encoding utf8
-}
-
-Write-Section "7. Creating review manifests"
-
-$readme = @"
-STH FREIGHT CALCULATOR - AI REVIEW PACKAGE
-Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')
-Project root used: $ProjectRoot
-
-PURPOSE
-This ZIP is intended for complete source-code and architecture review by an AI or another developer.
-
-INCLUDED
-- Django/Python application code.
-- Original templates, JavaScript and CSS.
-- Models, migrations, admin configuration, services and tests.
-- Docker and installation configuration found at the project root.
-- Documentation and optional reports.
-- Controlled reference spreadsheets when found.
-- Git state, project tree, Django checks, migration status, non-sensitive database counts and test results.
-
-EXCLUDED FOR SAFETY OR SIZE
-- Real .env files and credential files.
-- Private keys, certificates and database dumps.
-- .git history, virtual environments, caches and generated static files.
-- Uploaded media and historical imported files.
-- Complete PostgreSQL data.
-- Arbitrary spreadsheets. Only the three known reference files may be included.
-
-IMPORTANT
-Reference spreadsheets and reports can contain business information. Review the ZIP before sending it outside the organization.
-The DATABASE_SUMMARY file contains row counts only, not table contents.
-"@
-$readme | Out-File -FilePath (Join-Path $WorkPath "README_REVIEW_PACKAGE.txt") -Encoding utf8
-
-$ExcludedLog | Sort-Object | Out-File -FilePath (Join-Path $WorkPath "EXCLUDED_FILES.txt") -Encoding utf8
-
-$workRootResolved = (Resolve-Path -LiteralPath $WorkPath).Path
-Get-ChildItem -Path $WorkPath -Recurse -Force -ErrorAction SilentlyContinue |
-    Sort-Object FullName |
-    ForEach-Object {
-        $relative = $_.FullName.Substring($workRootResolved.Length).TrimStart([char[]]'\/')
-        if ($_.PSIsContainer) {
-            "[DIR]  $relative"
-        }
-        else {
-            "[FILE] $relative"
-        }
+        (($name -like ".env*") -and ($name -notlike "*.example") -and !$_.FullName.Contains("backup\private")) -or
+        $name -match "^(credentials?|secrets?|private[_-]?key).*"
     } |
-    Out-File -FilePath (Join-Path $WorkPath "PROJECT_TREE.txt") -Encoding utf8
+    ForEach-Object { Remove-PackageItem $_ "Potential secret or credential file" }
+
+Write-Section "6. Generating production deployment files"
+$productionCompose = @'
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/django/Dockerfile
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput &&
+      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
+    env_file:
+      - .env
+    volumes:
+      - ./uploaded_data:/app/uploaded_data
+      - ./sample_data:/app/sample_data:ro
+      - ./reports:/app/reports
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+'@
+$productionCompose | Out-File -LiteralPath (Join-Path $WorkPath "docker-compose.production.yml") -Encoding utf8
+
+$productionEnv = @'
+DEBUG=0
+SECRET_KEY=REPLACE_WITH_A_LONG_RANDOM_SECRET
+DJANGO_ALLOWED_HOSTS=freight.example.com
+POSTGRES_DB=freight_platform
+POSTGRES_USER=freight_user
+POSTGRES_PASSWORD=REPLACE_WITH_A_STRONG_DATABASE_PASSWORD
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+CALCULATOR_REQUIRE_AUTH=1
+MEDIA_ROOT=/app/uploaded_data
+SAVED_ESTIMATES_ENABLED=1
+ESTIMATE_EMAIL_ENABLED=0
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=
+EMAIL_PORT=587
+EMAIL_USE_TLS=1
+EMAIL_USE_SSL=0
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+DEFAULT_FROM_EMAIL=
+EMAIL_TIMEOUT=20
+'@
+$productionEnv | Out-File -LiteralPath (Join-Path $WorkPath ".env.production.example") -Encoding utf8
+
+$installGuide = @'
+# Production installation and backup restoration
+
+This package contains the application and Docker build context. HTTPS must be
+terminated by a separately managed reverse proxy. PostgreSQL and FTP are not
+published by the production Compose file.
+
+## New installation
+
+1. Verify INCLUDED_FILES_SHA256.txt before using the package.
+2. Copy .env.production.example to .env and replace every REPLACE_* value.
+3. Set DJANGO_ALLOWED_HOSTS to the real hostname.
+4. Run: docker compose -f docker-compose.production.yml build --pull
+5. Run: docker compose -f docker-compose.production.yml up -d db
+6. Run: docker compose -f docker-compose.production.yml run --rm web python manage.py migrate --noinput
+7. For a new database only, import the controlled workbook:
+   docker compose -f docker-compose.production.yml run --rm web python manage.py import_sth_excel /app/sample_data/V2026.R2_Unlocked_STH_Freight_Calculator.xlsx --client STH --replace
+8. Run setup_access_roles and create the initial superuser.
+9. Run: docker compose -f docker-compose.production.yml up -d
+10. Configure HTTPS, backups, monitoring, firewall rules, and SMTP externally.
+
+## Restore a FullBackup package
+
+1. Restore backup/private/.env as .env only when that sensitive file was
+   intentionally included; otherwise create a new .env.
+2. Start only PostgreSQL:
+   docker compose -f docker-compose.production.yml up -d db
+3. Copy the dump into the container:
+   docker compose -f docker-compose.production.yml cp backup/database/postgres.dump db:/tmp/postgres.dump
+4. Restore into an empty target database:
+   docker compose -f docker-compose.production.yml exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists /tmp/postgres.dump'
+5. Ensure uploaded_data is present, then start web and run migrations.
+
+Restoration overwrites database objects. Test the procedure in an isolated
+environment before using it against production.
+'@
+$installGuide | Out-File -LiteralPath (Join-Path $WorkPath "INSTALL_AND_RESTORE.md") -Encoding utf8
+
+Write-Section "7. Capturing Git and runtime evidence"
+$gitFile = Join-Path $WorkPath "GIT_STATE.txt"
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    @(
+        "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')",
+        "Branch: $(& git -C $ProjectRoot branch --show-current 2>&1)",
+        "Commit: $(& git -C $ProjectRoot rev-parse HEAD 2>&1)",
+        "Last commit: $(& git -C $ProjectRoot log -1 --format='%h | %ad | %an | %s' --date=iso-strict 2>&1)",
+        "", "Modified/untracked files:", (& git -C $ProjectRoot status --short 2>&1)
+    ) | Out-File -LiteralPath $gitFile -Encoding utf8
+}
+else { "Git is not available." | Out-File -LiteralPath $gitFile -Encoding utf8 }
+
+if (!$SkipRuntimeDiagnostics -and (Test-DockerService "web")) {
+    Invoke-CommandToFile docker @("compose", "--project-directory", $ProjectRoot, "exec", "-T", "web", "python", "manage.py", "check", "--deploy") "DJANGO_DEPLOY_CHECK.txt" "Django deployment check" | Out-Null
+    Invoke-CommandToFile docker @("compose", "--project-directory", $ProjectRoot, "exec", "-T", "web", "python", "manage.py", "makemigrations", "--check", "--dry-run") "MIGRATION_DRIFT.txt" "Django migration drift check" | Out-Null
+    Invoke-CommandToFile docker @("compose", "--project-directory", $ProjectRoot, "exec", "-T", "web", "python", "manage.py", "showmigrations") "MIGRATIONS_STATUS.txt" "Applied Django migrations" | Out-Null
+    if (!$SkipTests) {
+        Invoke-CommandToFile docker @("compose", "--project-directory", $ProjectRoot, "exec", "-T", "web", "python", "manage.py", "test", "-v", "2", "--noinput") "TEST_RESULTS.txt" "Complete Django test suite" | Out-Null
+    }
+}
+else {
+    "Runtime diagnostics were skipped or the web service was not running." | Out-File -LiteralPath (Join-Path $WorkPath "RUNTIME_DIAGNOSTICS.txt") -Encoding utf8
+}
+
+Write-Section "8. Creating manifests"
+$packageReadme = @"
+# STH Freight Calculator package
+
+Mode: $PackageMode
+Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')
+Source root: $ProjectRoot
+
+Deployment mode excludes live database contents, uploaded files, and secrets.
+FullBackup mode includes PostgreSQL and uploaded files unless explicitly skipped.
+The real .env is included only with -IncludeEnvironmentFile.
+
+Read INSTALL_AND_RESTORE.md before installation or restoration.
+Warnings are recorded in PACKAGE_WARNINGS.txt.
+"@
+$packageReadme | Out-File -LiteralPath (Join-Path $WorkPath "README_PACKAGE.md") -Encoding utf8
+$Warnings | Out-File -LiteralPath (Join-Path $WorkPath "PACKAGE_WARNINGS.txt") -Encoding utf8
+$ExcludedLog | Sort-Object | Out-File -LiteralPath (Join-Path $WorkPath "EXCLUDED_FILES.txt") -Encoding utf8
+$IncludedLog | Sort-Object -Unique | Out-File -LiteralPath (Join-Path $WorkPath "INCLUDED_PATHS.txt") -Encoding utf8
 
 $manifestPath = Join-Path $WorkPath "INCLUDED_FILES_SHA256.txt"
-"RelativePath`tSizeBytes`tSHA256" | Out-File -FilePath $manifestPath -Encoding utf8
-
-Get-ChildItem -Path $WorkPath -Recurse -File -Force -ErrorAction SilentlyContinue |
+"RelativePath`tSizeBytes`tSHA256" | Out-File -LiteralPath $manifestPath -Encoding utf8
+$resolvedWork = (Resolve-Path -LiteralPath $WorkPath).Path
+Get-ChildItem -LiteralPath $WorkPath -Recurse -File -Force |
     Where-Object { $_.FullName -ne $manifestPath } |
     Sort-Object FullName |
     ForEach-Object {
-        $relative = $_.FullName.Substring($workRootResolved.Length).TrimStart([char[]]'\/')
+        $relative = Get-RelativePath $resolvedWork $_.FullName
         $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        "$relative`t$($_.Length)`t$hash" | Out-File -FilePath $manifestPath -Append -Encoding utf8
+        "$relative`t$($_.Length)`t$hash" | Out-File -LiteralPath $manifestPath -Append -Encoding utf8
     }
 
-Write-Section "8. Creating ZIP"
-
-if (Test-Path -LiteralPath $ZipPath) {
-    Remove-Item -LiteralPath $ZipPath -Force
-}
-
+Write-Section "9. Creating and verifying ZIP"
+if (Test-Path -LiteralPath $ZipPath) { Remove-Item -LiteralPath $ZipPath -Force }
 Compress-Archive -Path (Join-Path $WorkPath "*") -DestinationPath $ZipPath -CompressionLevel Optimal -Force
-
 $zipItem = Get-Item -LiteralPath $ZipPath
 $zipHash = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-$sizeMb = [Math]::Round($zipItem.Length / 1MB, 2)
+"$zipHash  $($zipItem.Name)" | Out-File -LiteralPath "$ZipPath.sha256" -Encoding ascii
+
+$archiveEntries = @(tar -tf $ZipPath)
+foreach ($required in @("app/manage.py", "docker/django/Dockerfile", "requirements.txt", "docker-compose.production.yml", "INSTALL_AND_RESTORE.md", "INCLUDED_FILES_SHA256.txt")) {
+    if ($archiveEntries -notcontains $required) { throw "ZIP verification failed; required entry is missing: $required" }
+}
+if ($PackageMode -eq "FullBackup" -and !$SkipDatabaseBackup -and !$AllowIncompleteBackup -and $archiveEntries -notcontains "backup/database/postgres.dump") {
+    throw "ZIP verification failed; PostgreSQL dump is missing."
+}
 
 Write-Host ""
-Write-Host "OK: review ZIP created" -ForegroundColor Green
+Write-Host "OK: $PackageMode package created" -ForegroundColor Green
 Write-Host "File:   $($zipItem.FullName)" -ForegroundColor Green
-Write-Host "Size:   $sizeMb MB" -ForegroundColor Green
+Write-Host "Size:   $([Math]::Round($zipItem.Length / 1MB, 2)) MB" -ForegroundColor Green
 Write-Host "SHA256: $zipHash" -ForegroundColor Green
-Write-Host ""
-Write-Host "Before sharing, open the ZIP and review README_REVIEW_PACKAGE.txt and REFERENCE_FILES.txt." -ForegroundColor Cyan
+if ($Warnings.Count -gt 0) { Write-Warning "$($Warnings.Count) package warning(s); review PACKAGE_WARNINGS.txt." }
 
 if (!$KeepWorkDir) {
-    Remove-Item -LiteralPath $WorkPath -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "Temporary directory removed: $WorkPath" -ForegroundColor Gray
+    Remove-Item -LiteralPath $WorkPath -Recurse -Force
 }
-else {
-    Write-Host "Temporary directory kept: $WorkPath" -ForegroundColor Gray
-}
+else { Write-Host "Temporary package kept at: $WorkPath" -ForegroundColor Gray }
