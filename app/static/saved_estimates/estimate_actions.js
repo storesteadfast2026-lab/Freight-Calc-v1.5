@@ -51,7 +51,7 @@
     savedReference = null;
     savedUrls = null;
     saveButton.disabled = !lastCalculationResults;
-    saveButton.textContent = 'Save estimate';
+    saveButton.textContent = 'Save';
     updatePrintAvailability();
   }
 
@@ -110,7 +110,7 @@
       savedUrls = data;
       historyStateVersion += 1;
       savedEstimateCount = Number(data.visible_count) || 1;
-      saveButton.textContent = 'Save estimate';
+      saveButton.textContent = 'Save';
       saveButton.disabled = true;
       setStatus(`${savedReference} saved successfully.`, 'success');
       return data;

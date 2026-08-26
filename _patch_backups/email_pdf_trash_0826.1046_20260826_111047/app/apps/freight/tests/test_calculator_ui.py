@@ -89,8 +89,6 @@ class CalculatorVisualContractTests(TestCase):
         response = self.client.get(reverse('freight_calculator'))
 
         self.assertContains(response, 'onclick="addLine()"')
-        self.assertContains(response, 'class="trash-icon"')
-        self.assertContains(response, 'aria-label="Remove freight item"')
         self.assertContains(response, 'onclick="calculate()"')
         self.assertContains(response, "fetch('/api/calculate/'")
         self.assertNotContains(response, 'Save this shipment')

@@ -342,24 +342,20 @@ label{position:relative}.dropdown{left:0;right:auto;top:100%;box-sizing:border-b
   width:34px;
   height:34px;
   padding:0;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
   overflow:hidden;
+  font-size:0;
   background:#fff;
   border-radius:6px;
+}
+.calculator-page .remove-line::before{
+  content:"⌫";
+  display:block;
   color:#0b2b57;
+  font-size:19px;
+  line-height:30px;
+  transform:rotate(90deg);
 }
-.calculator-page .remove-line .trash-icon{
-  width:18px;
-  height:18px;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:1.9;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
-.calculator-page .remove-line:hover{border-color:#b42318;background:#fff5f4;color:#b42318}
+.calculator-page .remove-line:hover{border-color:#b42318;background:#fff5f4}
 .calculator-page .add-line-button{
   margin-top:11px;
   padding:8px 13px;

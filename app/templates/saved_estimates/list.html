@@ -40,11 +40,13 @@
             class="estimate-action"
             disabled
           >Email selected</button>
+
           <a
             class="estimate-action"
-            href="/"
-            onclick="returnToCalculator(event)"
-          >Back to calculator</a>
+            href="{% url 'freight_calculator' %}{% if requested_client %}?client={{ requested_client|urlencode }}{% endif %}"
+            >Back to calculator</a>
+
+          
         </div>
       </div>
 
@@ -125,12 +127,7 @@
 <script>
 window.ESTIMATE_EMAIL_ENABLED = {{ estimate_email_enabled|yesno:"true,false" }};
 window.ESTIMATE_EMAIL_MAX_SELECTION = {{ max_estimates_per_email }};
-function returnToCalculator(event) {
-  if (window.history.length > 1) {
-    event.preventDefault();
-    window.history.back();
-  }
-}
+
 </script>
 </body>
 </html>

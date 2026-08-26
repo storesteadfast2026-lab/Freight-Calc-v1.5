@@ -3,7 +3,6 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -175,73 +174,6 @@ class SavedEstimateTests(TestCase):
         self.assertEqual(
             xlsx_response['Content-Type'],
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        )
-
-
-    @override_settings(
-        ESTIMATE_EMAIL_ENABLED=True,
-        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
-        EMAIL_HOST='smtp.example.com',
-        EMAIL_PORT=587,
-        EMAIL_HOST_USER='sender@example.com',
-        EMAIL_HOST_PASSWORD='secret',
-        DEFAULT_FROM_EMAIL='sender@example.com',
-    )
-    def test_email_sends_pdf_attachment_and_keeps_quote_details_out_of_body(self):
-        self._save()
-        estimate = SavedEstimate.objects.get()
-        self.client.force_login(self.internal)
-
-        response = self.client.post(
-            reverse('saved_estimates:email'),
-            data={
-                'estimate_ids': [str(estimate.pk)],
-                'recipient': self.customer.email,
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(len(mail.outbox), 1)
-        message = mail.outbox[0]
-        self.assertIn('Please find attached the requested freight quotation.', message.body)
-        self.assertNotIn('Available freight options', message.body)
-        self.assertNotIn('KTI', message.body)
-        self.assertNotIn('123.45', message.body)
-        self.assertEqual(len(message.attachments), 1)
-        filename, content, mimetype = message.attachments[0]
-        self.assertEqual(filename, f'{estimate.reference}.pdf')
-        self.assertEqual(mimetype, 'application/pdf')
-        self.assertTrue(content.startswith(b'%PDF'))
-
-    @override_settings(
-        ESTIMATE_EMAIL_ENABLED=True,
-        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
-        EMAIL_HOST='smtp.example.com',
-        EMAIL_PORT=587,
-        EMAIL_HOST_USER='sender@example.com',
-        EMAIL_HOST_PASSWORD='secret',
-        DEFAULT_FROM_EMAIL='sender@example.com',
-    )
-    def test_email_attaches_one_pdf_per_selected_estimate(self):
-        self._save()
-        self._save()
-        estimates = list(SavedEstimate.objects.order_by('pk'))
-        self.client.force_login(self.internal)
-
-        response = self.client.post(
-            reverse('saved_estimates:email'),
-            data={
-                'estimate_ids': [str(estimate.pk) for estimate in estimates],
-                'recipient': self.customer.email,
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(len(mail.outbox[0].attachments), 2)
-        self.assertEqual(
-            {attachment[0] for attachment in mail.outbox[0].attachments},
-            {f'{estimate.reference}.pdf' for estimate in estimates},
         )
 
     def test_duplicate_api_returns_saved_input_without_recalculating(self):

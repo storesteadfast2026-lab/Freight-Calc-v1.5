@@ -3,14 +3,12 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_email
 from django.template.loader import render_to_string
 
 from apps.authentication_gateway.models import CalculatorUserProfile
 from apps.authentication_gateway.services import get_calculator_profile
-
-from .pdf_export import estimate_pdf_bytes, estimate_pdf_filename
 
 
 MAX_ESTIMATES_PER_EMAIL = 20
@@ -124,20 +122,15 @@ def send_estimates_email(*, sender_user, estimates, recipient):
         'sent_by': sender_user,
     }
     subject = _subject_for(estimates, client)
-    # Editable email body: app/templates/saved_estimates/email.txt
     text_body = render_to_string('saved_estimates/email.txt', context)
-    message = EmailMessage(
+    html_body = render_to_string('saved_estimates/email.html', context)
+    message = EmailMultiAlternatives(
         subject=subject,
         body=text_body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[allowed_recipient],
     )
-    for estimate in estimates:
-        message.attach(
-            estimate_pdf_filename(estimate),
-            estimate_pdf_bytes(estimate),
-            'application/pdf',
-        )
+    message.attach_alternative(html_body, 'text/html')
     message.send(fail_silently=False)
     return allowed_recipient
 
