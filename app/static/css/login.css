@@ -47,11 +47,21 @@ body.login-body {
   padding: 30px 30px 5px;
 }
 
-.logo-main {
+/*.logo-main {
   display: block;
   width: 100%;
   max-width: 300px;
   height: auto;
+  margin: 10px auto 15px;
+}
+*/
+.logo-main {
+  display: block;
+  width: auto;
+  max-width: 220px;
+  max-height: 110px;
+  height: auto;
+  object-fit: contain;
   margin: 10px auto 15px;
 }
 

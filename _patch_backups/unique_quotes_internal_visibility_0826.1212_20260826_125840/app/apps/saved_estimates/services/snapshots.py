@@ -1,5 +1,4 @@
 from decimal import Decimal, InvalidOperation
-import re
 from uuid import uuid4
 
 from django.db import transaction
@@ -18,21 +17,6 @@ from .calculation_bridge import (
 def _pending_reference():
     """Return a unique temporary value that fits reference.max_length."""
     return f'PENDING-{uuid4().hex[:24]}'
-
-
-def _client_reference_code(client_code):
-    """Return a short URL/file-safe client token for quote references."""
-    token = re.sub(r'[^A-Z0-9]+', '-', str(client_code or '').upper()).strip('-')
-    return (token or 'CLIENT')[:20]
-
-
-def _final_reference(estimate):
-    """Build a globally unique, human-readable freight quotation reference."""
-    local_date = timezone.localtime(estimate.created_at).strftime('%Y%m%d')
-    client_code = _client_reference_code(estimate.client.code)
-    # SavedEstimate.pk comes from PostgreSQL's global sequence, so it is unique
-    # across all clients. Eight digits is a minimum width, not a hard limit.
-    return f'FQ-{client_code}-{local_date}-{estimate.pk:08d}'
 
 
 @transaction.atomic
@@ -70,7 +54,8 @@ def create_verified_estimate(user, calculation_payload, displayed_results):
             verified_results[0].get('estimate_ex_gst')
         ),
     )
-    estimate.reference = _final_reference(estimate)
+    local_date = timezone.localtime(estimate.created_at).strftime('%Y%m%d')
+    estimate.reference = f'EST-{local_date}-{estimate.pk:06d}'
     estimate.save(update_fields=['reference'])
     return estimate
 

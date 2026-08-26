@@ -5,7 +5,7 @@ from django.db import models
 class SavedEstimate(models.Model):
     """Immutable calculation snapshot created outside the freight engine."""
 
-    reference = models.CharField(max_length=64, unique=True)
+    reference = models.CharField(max_length=32, unique=True)
     client = models.ForeignKey(
         'clients.Client',
         on_delete=models.PROTECT,

@@ -97,19 +97,6 @@ class SavedEstimateTests(TestCase):
         profile.allowed_clients.add(client)
         return user
 
-    def _internal_all_clients(self, username):
-        user = self.User.objects.create_user(
-            username=username,
-            email=username,
-            password='test-pass',
-        )
-        CalculatorUserProfile.objects.create(
-            user=user,
-            role=CalculatorUserProfile.Role.INTERNAL_USER,
-            client_scope=CalculatorUserProfile.ClientScope.ALL_CLIENTS,
-        )
-        return user
-
     def _save(self, user=None, displayed=None):
         self.client.force_login(user or self.customer)
         with patch(
@@ -131,23 +118,12 @@ class SavedEstimateTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         estimate = SavedEstimate.objects.get()
-        self.assertRegex(estimate.reference, r'^FQ-STH-\d{8}-\d{8,}$')
+        self.assertRegex(estimate.reference, r'^EST-\d{8}-\d{6}$')
         self.assertEqual(estimate.client, self.sth)
         self.assertEqual(estimate.created_by, self.customer)
         self.assertEqual(estimate.destination_label, 'ADELAIDE, SA 5000')
         self.assertEqual(estimate.best_estimate_ex_gst, Decimal('123.45'))
         self.assertEqual(estimate.result_snapshot, [displayed_result()])
-
-    def test_references_are_unique_across_clients_and_include_client_code(self):
-        sth_reference = self._save().json()['reference']
-
-        other_client_user = self._customer('other-client@example.com', self.other)
-        self.payload['client_code'] = 'OTHER'
-        other_reference = self._save(user=other_client_user).json()['reference']
-
-        self.assertRegex(sth_reference, r'^FQ-STH-\d{8}-\d{8,}$')
-        self.assertRegex(other_reference, r'^FQ-OTHER-\d{8}-\d{8,}$')
-        self.assertNotEqual(sth_reference, other_reference)
 
     def test_save_rejects_browser_result_that_does_not_match_engine(self):
         response = self._save(displayed=[displayed_result('999.99')])
@@ -172,59 +148,6 @@ class SavedEstimateTests(TestCase):
         response = self.client.get(reverse('saved_estimates:list'))
 
         self.assertContains(response, reference)
-
-    def test_internal_user_sees_all_customer_quotes_for_authorised_client(self):
-        first_reference = self._save(user=self.customer).json()['reference']
-        second_reference = self._save(user=self.other_customer).json()['reference']
-        self.client.force_login(self.internal)
-
-        response = self.client.get(reverse('saved_estimates:list'))
-
-        self.assertContains(response, first_reference)
-        self.assertContains(response, second_reference)
-        self.assertContains(response, self.customer.email)
-        self.assertContains(response, self.other_customer.email)
-        self.assertContains(response, 'Created by')
-        self.assertEqual(response.context['estimates'].count(), 2)
-
-    def test_all_clients_internal_user_sees_quotes_across_clients(self):
-        sth_reference = self._save(user=self.customer).json()['reference']
-        other_client_user = self._customer('external-other@example.com', self.other)
-        self.payload['client_code'] = 'OTHER'
-        other_reference = self._save(user=other_client_user).json()['reference']
-        self.payload['client_code'] = 'STH'
-        internal_all = self._internal_all_clients('internal-all@example.com')
-        self.client.force_login(internal_all)
-
-        response = self.client.get(reverse('saved_estimates:list'))
-
-        self.assertContains(response, sth_reference)
-        self.assertContains(response, other_reference)
-        self.assertContains(response, self.customer.email)
-        self.assertContains(response, other_client_user.email)
-        self.assertEqual(response.context['estimates'].count(), 2)
-
-    def test_selected_clients_internal_user_does_not_see_unauthorised_client(self):
-        sth_reference = self._save(user=self.customer).json()['reference']
-        other_client_user = self._customer('blocked-other@example.com', self.other)
-        self.payload['client_code'] = 'OTHER'
-        other_reference = self._save(user=other_client_user).json()['reference']
-        self.payload['client_code'] = 'STH'
-        self.client.force_login(self.internal)
-
-        response = self.client.get(reverse('saved_estimates:list'))
-
-        self.assertContains(response, sth_reference)
-        self.assertNotContains(response, other_reference)
-        self.assertEqual(response.context['estimates'].count(), 1)
-
-    def test_customer_history_hides_created_by_column(self):
-        self._save(user=self.customer)
-        self.client.force_login(self.customer)
-
-        response = self.client.get(reverse('saved_estimates:list'))
-
-        self.assertNotContains(response, '<th>Created by</th>', html=False)
 
     def test_customer_cannot_export_tabular_files(self):
         reference = self._save().json()['reference']
