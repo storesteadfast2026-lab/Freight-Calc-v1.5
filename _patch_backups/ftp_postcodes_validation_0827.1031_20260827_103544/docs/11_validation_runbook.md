@@ -547,15 +547,3 @@ docker compose exec -T web python manage.py test --noinput -v 2
 
 Activation remains separate from validation. A successful preview is not an
 authorisation to activate if regression tests are failing.
-
-## FTP postcodes validation - 2026-08-27
-
-Run `python manage.py process_uploaded_postcodes --client STH --filename postcodes.csv` after a new FTP drop. Review: rows read, Australian candidate rows, excluded rows, existing matches, rows that would be added, and current Django rows not present in the source. The command must end with `VALIDATION ONLY` and must not change `locations.Suburb`.
-
-Do not implement or run a postcode activation until the `current Django rows not in source` delta has been reviewed. Initial activation should preserve unmatched current rows unless a separate deletion policy is approved and tested with Zones and calculator regression cases.
-
-## FTP postcodes cross-validation - 2026-08-27
-
-After the structural postcodes validation passes, run `process_uploaded_postcodes` again with the Phase 2 implementation. The command remains read-only for `locations.Suburb`, but it cross-validates every prospective addition against the current operational `FreightZone` data for the client.
-
-Decisions are intentionally conservative: `ADD_CANDIDATE` requires an exact suburb/state/postcode zone reference. `REVIEW_ALIAS_LIKELY`, `REVIEW_POSTCODE_CONFLICT`, and `REVIEW_NO_EXACT_ZONE` remain blocked from any future add-only activation until manually resolved. Existing Django suburbs that are absent from the source remain `PRESERVE EXISTING`; this phase never deletes or renames suburbs.

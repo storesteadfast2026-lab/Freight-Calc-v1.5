@@ -102,7 +102,6 @@
   <div class="sth-validation-head {{ status_class }}">
     <div class="sth-validation-title">FUEL VALIDATION — {{ status_label|upper }}</div>
     <div class="sth-validation-meta">
-      Format {{ summary.source_format|default:"LEGACY" }} ·
       Updated {{ summary.source_updated|default:"—" }} ·
       Expires {{ summary.source_expires|default:"—" }} ·
       {{ summary.rows_valid|default:0 }}/{{ summary.rows_received|default:0 }} valid ·
@@ -199,49 +198,6 @@
         {% for value in ratecards_not_found %}<span class="sth-chip">{{ value }}</span>{% empty %}<span>None</span>{% endfor %}
       </div>
     </details>
-
-    {% if summary.carrier_checks %}
-      <details class="sth-details">
-        <summary>FTP carrier checks ({{ summary.carrier_checks|length }})</summary>
-        <div class="sth-table-wrap">
-          <table class="sth-compact-table">
-            <thead><tr><th>Ratecard</th><th>File carrier</th><th>Expected</th><th>Relevant</th><th>Result</th></tr></thead>
-            <tbody>
-              {% for row in summary.carrier_checks %}
-                <tr>
-                  <td><code>{{ row.ratecard }}</code></td>
-                  <td>{{ row.file_carrier }}</td>
-                  <td>{{ row.expected_carriers|join:", "|default:"—" }}</td>
-                  <td>{% if row.relevant_to_client %}Yes{% else %}No{% endif %}</td>
-                  <td>{{ row.result }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </details>
-    {% endif %}
-
-    {% if summary.type_checks %}
-      <details class="sth-details">
-        <summary>FTP type checks ({{ summary.type_checks|length }})</summary>
-        <div class="sth-table-wrap">
-          <table class="sth-compact-table">
-            <thead><tr><th>Ratecard</th><th>Type</th><th>Relevant</th><th>Result</th></tr></thead>
-            <tbody>
-              {% for row in summary.type_checks %}
-                <tr>
-                  <td><code>{{ row.ratecard }}</code></td>
-                  <td>{{ row.file_type }}</td>
-                  <td>{% if row.relevant_to_client %}Yes{% else %}No{% endif %}</td>
-                  <td>{{ row.result }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </details>
-    {% endif %}
 
     <div class="sth-table-wrap sth-tech-table">
       <table class="sth-compact-table">

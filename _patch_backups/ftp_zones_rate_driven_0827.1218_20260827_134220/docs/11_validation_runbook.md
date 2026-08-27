@@ -559,3 +559,19 @@ Do not implement or run a postcode activation until the `current Django rows not
 After the structural postcodes validation passes, run `process_uploaded_postcodes` again with the Phase 2 implementation. The command remains read-only for `locations.Suburb`, but it cross-validates every prospective addition against the current operational `FreightZone` data for the client.
 
 Decisions are intentionally conservative: `ADD_CANDIDATE` requires an exact suburb/state/postcode zone reference. `REVIEW_ALIAS_LIKELY`, `REVIEW_POSTCODE_CONFLICT`, and `REVIEW_NO_EXACT_ZONE` remain blocked from any future add-only activation until manually resolved. Existing Django suburbs that are absent from the source remain `PRESERVE EXISTING`; this phase never deletes or renames suburbs.
+
+## FTP Zones validation - 2026-08-27
+
+`uploaded_data/zones.csv` is introduced as a validation-only FTP source before any operational activation is implemented.
+
+Run:
+
+```text
+python manage.py process_uploaded_zones --client STH --filename zones.csv
+```
+
+The command snapshots the immutable source, reuses identical SHA-256 content, validates the CSV index contracts, reports exact duplicate rows, separates Australian/non-Australian rows, flags Australian postcodes that are not exactly four digits without auto-padding them, maps source carrier rows to the current Django carrier service where that mapping is unambiguous, and compares the result with current `FreightZone`, `Suburb`, and `FreightRate` data.
+
+This phase does not add, update, replace, rename, or delete `FreightZone` rows. Current rows missing from the safely mapped source comparison are preserved.
+
+The source has no service column, so ambiguous carrier-to-service mappings are review items and must not be guessed.

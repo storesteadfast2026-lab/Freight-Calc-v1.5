@@ -25,9 +25,7 @@ from apps.imports.models import ExternalDataFile
 from apps.imports.services.audit import create_audit_event
 
 
-LEGACY_REQUIRED_COLUMNS = ('master_rate', 'info', 'rate', 'updated', 'expires', 'warnings')
-FTP_REQUIRED_COLUMNS = ('rate_no', 'carrier', 'name', 'surcharge', 'type')
-SUPPORTED_FTP_FUEL_TYPES = {'PRICE'}
+REQUIRED_COLUMNS = ('master_rate', 'info', 'rate', 'updated', 'expires', 'warnings')
 REMEMBERED_SOURCE_STATUSES = ('VALIDATED', 'ACTIVE', 'ROLLED_BACK', 'ARCHIVED')
 
 
@@ -39,15 +37,11 @@ class FuelImportError(Exception):
 class FuelRateRow:
     line_number: int
     master_rate: str
-    rate: Decimal | None
+    rate: Decimal
     info: str
     updated: date | None
     expires: date | None
     warnings: str
-    source_format: str = 'LEGACY'
-    source_carrier: str = ''
-    source_type: str = ''
-    raw_rate: str = ''
 
 
 def normalize_ratecard(value) -> str:
@@ -259,46 +253,14 @@ def create_downloaded_fuel_file(*, client, actor, source_url='', notes='', reque
         raise FuelImportError(str(exc)) from exc
 
 
-def _normalised_header_map(reader: csv.DictReader) -> dict[str, str]:
-    return {
-        str(header or '').strip().lower(): header
-        for header in (reader.fieldnames or [])
-        if str(header or '').strip()
-    }
-
-
-def _detect_fuel_source_format(header_map: dict[str, str]) -> str:
-    header_keys = set(header_map)
-    if set(LEGACY_REQUIRED_COLUMNS).issubset(header_keys):
-        return 'LEGACY'
-    if set(FTP_REQUIRED_COLUMNS).issubset(header_keys):
-        return 'FTP'
-    legacy_missing = [column for column in LEGACY_REQUIRED_COLUMNS if column not in header_keys]
-    ftp_missing = [column for column in FTP_REQUIRED_COLUMNS if column not in header_keys]
-    raise FuelImportError(
-        'Fuel CSV does not match a supported schema. '
-        f'Legacy schema missing: {", ".join(legacy_missing) or "none"}. '
-        f'FTP schema missing: {", ".join(ftp_missing) or "none"}.'
-    )
-
-
-def _parse_ftp_surcharge(value: str, *, line_number: int) -> Decimal:
-    text = str(value or '').strip()
-    if not text:
-        raise FuelImportError(f'Line {line_number}: surcharge is required.')
-    text = text.rstrip('%').strip()
-    try:
-        raw_percentage = Decimal(text)
-    except InvalidOperation as exc:
-        raise FuelImportError(f'Line {line_number}: invalid surcharge {value!r}.') from exc
-    return raw_percentage / Decimal('100')
-
-
 def parse_fuel_rows(content: bytes) -> tuple[list[FuelRateRow], list[str]]:
     text = decode_csv_bytes(content)
     reader = csv.DictReader(io.StringIO(text))
-    header_map = _normalised_header_map(reader)
-    source_format = _detect_fuel_source_format(header_map)
+    raw_headers = reader.fieldnames or []
+    header_map = {str(header or '').strip().lower(): header for header in raw_headers}
+    missing = [column for column in REQUIRED_COLUMNS if column not in header_map]
+    if missing:
+        raise FuelImportError(f'Missing required columns: {", ".join(missing)}.')
 
     rows: list[FuelRateRow] = []
     seen: set[str] = set()
@@ -312,89 +274,50 @@ def parse_fuel_rows(content: bytes) -> tuple[list[FuelRateRow], list[str]]:
         }
         if not any(normalized.values()):
             continue
-
-        if source_format == 'FTP':
-            ratecard = normalize_ratecard(normalized.get('rate_no'))
-            if not ratecard:
-                raise FuelImportError(f'Line {line_number}: rate_no is required.')
-            source_carrier = str(normalized.get('carrier') or '').strip().upper()
-            if not source_carrier:
-                raise FuelImportError(f'Line {line_number}: carrier is required.')
-            source_type = str(normalized.get('type') or '').strip().upper()
-            if not source_type:
-                raise FuelImportError(f'Line {line_number}: type is required.')
-            rate = _parse_ftp_surcharge(normalized.get('surcharge', ''), line_number=line_number)
-            info = normalized.get('name', '')
-            updated = None
-            expires = None
-            row_warning = ''
-            raw_rate = normalized.get('surcharge', '')
-        else:
-            ratecard = normalize_ratecard(normalized.get('master_rate'))
-            if not ratecard:
-                raise FuelImportError(f'Line {line_number}: master_rate is required.')
-            source_carrier = ''
-            source_type = ''
-            try:
-                rate = parse_decimal_rate(normalized.get('rate', ''))
-            except FuelImportError as exc:
-                raise FuelImportError(f'Line {line_number}: {exc}') from exc
-            try:
-                updated = parse_date(normalized.get('updated', ''))
-                expires = parse_date(normalized.get('expires', ''))
-            except FuelImportError as exc:
-                raise FuelImportError(f'Line {line_number}: {exc}') from exc
-            if updated and expires and expires < updated:
-                raise FuelImportError(f'Line {line_number}: expires is earlier than updated.')
-            info = normalized.get('info', '')
-            row_warning = normalized.get('warnings', '')
-            raw_rate = normalized.get('rate', '')
-
+        ratecard = normalize_ratecard(normalized.get('master_rate'))
+        if not ratecard:
+            raise FuelImportError(f'Line {line_number}: master_rate is required.')
         if ratecard in seen:
-            label = 'rate_no' if source_format == 'FTP' else 'master_rate'
-            raise FuelImportError(f'Line {line_number}: duplicate {label} {ratecard}.')
+            raise FuelImportError(f'Line {line_number}: duplicate master_rate {ratecard}.')
         seen.add(ratecard)
-
+        try:
+            rate = parse_decimal_rate(normalized.get('rate', ''))
+        except FuelImportError as exc:
+            raise FuelImportError(f'Line {line_number}: {exc}') from exc
         if rate < 0 or rate > maximum_rate:
             raise FuelImportError(
-                f'Line {line_number}: normalised rate {rate} is outside the allowed range '
-                f'0 to {maximum_rate}.'
+                f'Line {line_number}: rate {rate} is outside the allowed range 0 to {maximum_rate}.'
             )
+        try:
+            updated = parse_date(normalized.get('updated', ''))
+            expires = parse_date(normalized.get('expires', ''))
+        except FuelImportError as exc:
+            raise FuelImportError(f'Line {line_number}: {exc}') from exc
+        if updated and expires and expires < updated:
+            raise FuelImportError(f'Line {line_number}: expires is earlier than updated.')
+        row_warning = normalized.get('warnings', '')
         if row_warning and row_warning not in warnings:
             warnings.append(row_warning)
-
         rows.append(
             FuelRateRow(
                 line_number=line_number,
                 master_rate=ratecard,
                 rate=rate,
-                info=info,
+                info=normalized.get('info', ''),
                 updated=updated,
                 expires=expires,
                 warnings=row_warning,
-                source_format=source_format,
-                source_carrier=source_carrier,
-                source_type=source_type,
-                raw_rate=raw_rate,
             )
         )
-
     if not rows:
         raise FuelImportError('The fuel CSV does not contain any data rows.')
     return rows, warnings
+
 
 def _source_dates(rows: Iterable[FuelRateRow]) -> tuple[date | None, date | None]:
     updated = next((row.updated for row in rows if row.updated), None)
     expires = next((row.expires for row in rows if row.expires), None)
     return updated, expires
-
-
-def _row_matches_config(row: FuelRateRow, config: ClientCarrierConfig) -> bool:
-    if normalize_ratecard(config.ratecard) != row.master_rate:
-        return False
-    if row.source_format == 'FTP':
-        return config.carrier_service.carrier.code.upper() == row.source_carrier
-    return True
 
 
 def build_validation_summary(external_file: ExternalDataFile, rows: list[FuelRateRow], warnings: list[str]) -> dict:
@@ -403,74 +326,21 @@ def build_validation_summary(external_file: ExternalDataFile, rows: list[FuelRat
         .select_related('carrier_service__carrier')
         .order_by('carrier_service__carrier__code', 'carrier_service__service_code')
     )
-    rows_by_card = {row.master_rate: row for row in rows}
+    rates_by_card = {row.master_rate: row for row in rows}
     configs_by_card: dict[str, list[ClientCarrierConfig]] = {}
     for config in configs:
         card = normalize_ratecard(config.ratecard)
         if card:
             configs_by_card.setdefault(card, []).append(config)
 
-    source_format = rows[0].source_format if rows else 'UNKNOWN'
-    summary_warnings = list(warnings)
-    errors: list[str] = []
-    carrier_checks: list[dict] = []
-    type_checks: list[dict] = []
-
-    if source_format == 'FTP':
-        for row in rows:
-            matching_configs = configs_by_card.get(row.master_rate, [])
-            expected_carriers = sorted(
-                {config.carrier_service.carrier.code.upper() for config in matching_configs}
-            )
-            relevant = bool(matching_configs)
-            carrier_ok = not relevant or row.source_carrier in expected_carriers
-            type_ok = row.source_type in SUPPORTED_FTP_FUEL_TYPES
-            carrier_checks.append(
-                {
-                    'ratecard': row.master_rate,
-                    'file_carrier': row.source_carrier,
-                    'expected_carriers': expected_carriers,
-                    'relevant_to_client': relevant,
-                    'result': 'PASS' if carrier_ok else 'FAIL',
-                }
-            )
-            type_checks.append(
-                {
-                    'ratecard': row.master_rate,
-                    'file_type': row.source_type,
-                    'relevant_to_client': relevant,
-                    'result': 'PASS' if type_ok else ('FAIL' if relevant else 'WARNING'),
-                }
-            )
-            if relevant and not carrier_ok:
-                errors.append(
-                    f'Rate card {row.master_rate} carrier mismatch: file says '
-                    f'{row.source_carrier}; Django expects {", ".join(expected_carriers)}.'
-                )
-            if relevant and not type_ok:
-                errors.append(
-                    f'Rate card {row.master_rate} uses unsupported fuel type {row.source_type}. '
-                    f'Supported types: {", ".join(sorted(SUPPORTED_FTP_FUEL_TYPES))}.'
-                )
-            elif not relevant and not type_ok:
-                summary_warnings.append(
-                    f'Unused rate card {row.master_rate} has unsupported fuel type '
-                    f'{row.source_type}; it will not affect client {external_file.client.code}.'
-                )
-
     preview = []
     updated_count = 0
     unchanged_count = 0
-    matched_config_ids: set[int] = set()
-    matched_cards: set[str] = set()
-    for row in rows:
-        if row.source_format == 'FTP' and row.source_type not in SUPPORTED_FTP_FUEL_TYPES:
+    for card, matching_configs in configs_by_card.items():
+        row = rates_by_card.get(card)
+        if row is None:
             continue
-        for config in configs_by_card.get(row.master_rate, []):
-            if not _row_matches_config(row, config):
-                continue
-            matched_config_ids.add(config.pk)
-            matched_cards.add(row.master_rate)
+        for config in matching_configs:
             changed = config.fuel_levy != row.rate
             if changed:
                 updated_count += 1
@@ -481,17 +351,14 @@ def build_validation_summary(external_file: ExternalDataFile, rows: list[FuelRat
                     'config_id': config.pk,
                     'carrier': config.carrier_service.carrier.code,
                     'service': config.carrier_service.service_code,
-                    'ratecard': row.master_rate,
+                    'ratecard': card,
                     'current_rate': str(config.fuel_levy),
                     'new_rate': str(row.rate),
-                    'source_carrier': row.source_carrier,
-                    'source_type': row.source_type,
-                    'source_raw_rate': row.raw_rate,
                     'result': 'CHANGE' if changed else 'UNCHANGED',
                 }
             )
 
-    csv_cards = set(rows_by_card)
+    csv_cards = set(rates_by_card)
     django_cards = set(configs_by_card)
     duplicate_file = (
         ExternalDataFile.objects.filter(
@@ -503,64 +370,40 @@ def build_validation_summary(external_file: ExternalDataFile, rows: list[FuelRat
     )
     updated, expires = _source_dates(rows)
     today = timezone.localdate()
+    summary_warnings = list(warnings)
     if expires and expires < today:
         summary_warnings.append(f'Fuel dataset expired on {expires.isoformat()}.')
-    if duplicate_file:
-        summary_warnings.append(f'Duplicate content already exists in file #{duplicate_file.pk}.')
-
-    unmatched_client_configs = [
-        {
-            'config_id': config.pk,
-            'carrier': config.carrier_service.carrier.code,
-            'service': config.carrier_service.service_code,
-            'ratecard': normalize_ratecard(config.ratecard),
-        }
-        for config in configs
-        if normalize_ratecard(config.ratecard) and config.pk not in matched_config_ids
-    ]
 
     return {
-        'source_format': source_format,
         'rows_received': len(rows),
         'rows_valid': len(rows),
-        'rows_invalid': 0 if not errors else len(errors),
+        'rows_invalid': 0,
         'configs_to_update': updated_count,
         'configs_unchanged': unchanged_count,
-        'configs_matched': len(matched_config_ids),
-        'ratecards_matched': sorted(matched_cards),
+        'ratecards_matched': sorted(csv_cards & django_cards),
         'ratecards_not_found_in_django': sorted(csv_cards - django_cards),
         'django_ratecards_missing_from_file': sorted(django_cards - csv_cards),
-        'unmatched_client_configs': unmatched_client_configs,
         'source_updated': updated.isoformat() if updated else None,
         'source_expires': expires.isoformat() if expires else None,
         'is_expired': bool(expires and expires < today),
         'duplicate_file_id': duplicate_file.pk if duplicate_file else None,
         'duplicate_file_status': duplicate_file.status if duplicate_file else None,
-        'normalisation': (
-            {'surcharge_conversion': 'percentage / 100 -> decimal fuel levy'}
-            if source_format == 'FTP'
-            else {'rate_conversion': 'legacy rate preserved; % suffix divided by 100'}
-        ),
-        'carrier_checks': carrier_checks,
-        'type_checks': type_checks,
-        'warnings': summary_warnings,
-        'errors': errors,
+        'warnings': summary_warnings + ([f'Duplicate content already exists in file #{duplicate_file.pk}.'] if duplicate_file else []),
+        'errors': [],
         'preview': preview,
     }
+
 
 def validate_fuel_file(external_file: ExternalDataFile, *, actor=None, request=None) -> dict:
     if external_file.file_type != 'FUEL':
         raise FuelImportError('Only FUEL files can be validated by this operation.')
     request_id = hashlib.sha256(f'validate:{timezone.now().isoformat()}:{external_file.pk}'.encode()).hexdigest()[:32]
-    summary = None
     try:
         content = read_file_bytes(external_file)
         calculated_hash = calculate_sha256(content)
         external_file.sha256 = calculated_hash
         rows, warnings = parse_fuel_rows(content)
         summary = build_validation_summary(external_file, rows, warnings)
-        if summary.get('errors'):
-            raise FuelImportError('Fuel validation failed: ' + ' | '.join(summary['errors']))
         external_file.file_size_bytes = len(content)
         external_file.validation_summary = summary
         external_file.validated_by = actor if getattr(actor, 'is_authenticated', False) else None
@@ -590,17 +433,13 @@ def validate_fuel_file(external_file: ExternalDataFile, *, actor=None, request=N
     except Exception as exc:
         external_file.status = 'VALIDATION_FAILED'
         external_file.error_message = str(exc)
-        if summary is None:
-            summary = {
-                'rows_received': 0,
-                'rows_valid': 0,
-                'rows_invalid': 0,
-                'warnings': [],
-                'errors': [str(exc)],
-            }
-        else:
-            summary = {**summary, 'errors': summary.get('errors') or [str(exc)]}
-        external_file.validation_summary = summary
+        external_file.validation_summary = {
+            'rows_received': 0,
+            'rows_valid': 0,
+            'rows_invalid': 0,
+            'warnings': [],
+            'errors': [str(exc)],
+        }
         external_file.validated_by = actor if getattr(actor, 'is_authenticated', False) else None
         external_file.validated_at = timezone.now()
         external_file.save(
@@ -625,11 +464,7 @@ def validate_fuel_file(external_file: ExternalDataFile, *, actor=None, request=N
 
 
 def _fuel_source_label(external_file: ExternalDataFile) -> str:
-    if external_file.source_method == 'ADMIN_WEB_FETCH':
-        return 'ADMIN_WEB_FETCH'
-    if external_file.source_method == 'FTP_DROP':
-        return 'FTP_DROP'
-    return 'ADMIN_UPLOAD'
+    return 'ADMIN_WEB_FETCH' if external_file.source_method == 'ADMIN_WEB_FETCH' else 'ADMIN_UPLOAD'
 
 
 def activate_fuel_file(
@@ -686,9 +521,7 @@ def activate_fuel_file(
             for config in configs:
                 card = normalize_ratecard(config.ratecard)
                 row = rates_by_card.get(card)
-                if row is None or not _row_matches_config(row, config):
-                    continue
-                if row.source_format == 'FTP' and row.source_type not in SUPPORTED_FTP_FUEL_TYPES:
+                if row is None:
                     continue
                 matched_cards.add(card)
                 old_source_file_id = config.fuel_data_file_id

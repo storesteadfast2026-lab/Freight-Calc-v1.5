@@ -31,7 +31,6 @@ class ExternalDataFile(models.Model):
     SOURCE_METHODS = [
         ('ADMIN_UPLOAD', 'Admin upload'),
         ('ADMIN_WEB_FETCH', 'Admin web fetch'),
-        ('FTP_DROP', 'FTP uploaded_data drop'),
         ('COMMAND', 'Management command'),
     ]
     STATUSES = [

@@ -199,7 +199,3 @@ For a functional Fuel-source change, the minimum automated gate is:
 Postcodes Phase 2 adds tests for schema, source-index integrity, duplicate rejection, leading-zero preservation, invalid/non-Australian candidate exclusion, legitimate multiple postcodes for one suburb/state, idempotent FTP snapshots, delta preview, and the invariant that validation never mutates the operational Suburb table.
 
 This change does not touch freight calculation logic, FreightZone, FreightRate, Product or Fuel activation logic.
-
-## FTP postcodes cross-validation regression - 2026-08-27
-
-Targeted tests cover exact FreightZone evidence, likely alias detection, postcode conflicts, read-only behaviour, and re-validation of an existing Phase 1 snapshot when its stored summary predates cross-validation. Imports regression remains the mandatory test gate for this patch; the full Django suite can be run separately after the operational postcodes activation design is approved.

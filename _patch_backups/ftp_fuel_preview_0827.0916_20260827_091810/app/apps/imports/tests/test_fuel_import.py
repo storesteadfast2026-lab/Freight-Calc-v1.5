@@ -377,16 +377,6 @@ class FTPFuelImportTests(TestCase):
         self.assertNotEqual(Path(first.uploaded_file.path).resolve(), source.resolve())
 
     def test_process_uploaded_fuel_command_validates_only_and_never_activates(self):
-        other_carrier = Carrier.objects.create(code='KTI', name='KTI')
-        other_service = CarrierService.objects.create(carrier=other_carrier, service_code='GENERAL')
-        ClientCarrierConfig.objects.create(
-            client=self.client_obj,
-            carrier_service=other_service,
-            ratecard='715',
-            fuel_levy=Decimal('0.210000'),
-            fuel_levy_source='LEGACY_WORKBOOK',
-        )
-
         source = Path(self.media_dir.name) / 'fuel.csv'
         source.write_bytes(FTP_VALID_CSV)
         output = StringIO()
@@ -394,36 +384,9 @@ class FTPFuelImportTests(TestCase):
             call_command('process_uploaded_fuel', '--client', 'STH', stdout=output)
         self.config.refresh_from_db()
         external_file = ExternalDataFile.objects.get(source_method='FTP_DROP')
-        rendered = output.getvalue()
         self.assertEqual(external_file.status, 'VALIDATED')
         self.assertEqual(self.config.fuel_levy, Decimal('0.080000'))
-        self.assertIn('MATCHED CLIENT CONFIGURATIONS', rendered)
-        self.assertIn('TEAMEX', rendered)
-        self.assertIn('8.00%', rendered)
-        self.assertIn('42.90%', rendered)
-        self.assertIn('CLIENT CONFIGURATIONS MISSING FROM SOURCE', rendered)
-        self.assertIn('KTI', rendered)
-        self.assertIn('715', rendered)
-        self.assertIn('PRESERVE EXISTING', rendered)
-        self.assertIn('NO FUEL RATES WERE ACTIVATED', rendered)
-
-    def test_process_uploaded_fuel_reuses_validated_summary_and_prints_preview(self):
-        source = Path(self.media_dir.name) / 'fuel.csv'
-        source.write_bytes(FTP_VALID_CSV)
-        first_output = StringIO()
-        second_output = StringIO()
-        with override_settings(FTP_UPLOADED_DATA_DIR=self.media_dir.name):
-            call_command('process_uploaded_fuel', '--client', 'STH', stdout=first_output)
-            call_command('process_uploaded_fuel', '--client', 'STH', stdout=second_output)
-
-        self.config.refresh_from_db()
-        self.assertEqual(self.config.fuel_levy, Decimal('0.080000'))
-        rendered = second_output.getvalue()
-        self.assertIn('No new snapshot created', rendered)
-        self.assertIn('Reusing the existing validation summary for review.', rendered)
-        self.assertIn('MATCHED CLIENT CONFIGURATIONS', rendered)
-        self.assertIn('42.90%', rendered)
-        self.assertIn('NO FUEL RATES WERE ACTIVATED', rendered)
+        self.assertIn('NO FUEL RATES WERE ACTIVATED', output.getvalue())
 
     def test_process_uploaded_fuel_revalidates_identical_failed_snapshot(self):
         source = Path(self.media_dir.name) / 'fuel.csv'

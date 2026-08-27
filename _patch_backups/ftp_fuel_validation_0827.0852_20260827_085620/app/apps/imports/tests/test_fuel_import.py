@@ -4,11 +4,9 @@ from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
-from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from unittest.mock import patch
-from io import StringIO
 
 from apps.audit.models import AuditEvent
 from apps.carriers.models import Carrier, CarrierService, ClientCarrierConfig
@@ -18,17 +16,13 @@ from apps.imports.services.fuel import (
     FuelImportError,
     activate_fuel_file,
     calculate_sha256,
-    parse_fuel_rows,
     reapply_active_fuel_rates,
     rollback_fuel_file,
     validate_fuel_file,
 )
-from apps.imports.services.uploaded_data import snapshot_ftp_fuel_file
 
 
 VALID_CSV = b"""master_rate,info,rate,updated,expires,warnings\n1420,Purple,0.095,01/01/2099,31/12/2099,\n1115,,0.26,,,\n"""
-
-FTP_VALID_CSV = b"""rate_no,carrier,name,surcharge,type\n1420,TEAMEX,Team Fuel,42.90,PRICE\n9999,OTHER,Unused Fuel,15.00,PRICE\n"""
 
 
 class FuelImportTests(TestCase):
@@ -267,176 +261,3 @@ class FuelImportTests(TestCase):
             justification='Approved for controlled historical validation.',
         )
         self.assertTrue(result['forced_expired_activation'])
-
-
-class FTPFuelImportTests(TestCase):
-    def setUp(self):
-        self.media_dir = tempfile.TemporaryDirectory()
-        self.override = override_settings(MEDIA_ROOT=self.media_dir.name, FUEL_RATE_MAX='1.0')
-        self.override.enable()
-        self.addCleanup(self.override.disable)
-        self.addCleanup(self.media_dir.cleanup)
-
-        self.user = get_user_model().objects.create_user(
-            username='ftp-fuel-admin', password='password', is_staff=True, is_superuser=True
-        )
-        self.client_obj = Client.objects.create(code='STH', name='Stenhoj Australia', active=True)
-        carrier = Carrier.objects.create(code='TEAMEX', name='Team Global Express')
-        service = CarrierService.objects.create(carrier=carrier, service_code='ROAD')
-        self.config = ClientCarrierConfig.objects.create(
-            client=self.client_obj,
-            carrier_service=service,
-            ratecard='1420',
-            fuel_levy=Decimal('0.080000'),
-            fuel_levy_source='LEGACY_WORKBOOK',
-        )
-
-    def create_ftp_file(self, content=FTP_VALID_CSV, filename='fuel.csv'):
-        external_file = ExternalDataFile.objects.create(
-            client=self.client_obj,
-            file_type='FUEL',
-            source_method='FTP_DROP',
-            original_filename=filename,
-            status='UPLOADED',
-            uploaded_by=self.user,
-            file_size_bytes=len(content),
-            sha256=calculate_sha256(content),
-            mime_type='text/csv',
-        )
-        external_file.uploaded_file.save(filename, ContentFile(content), save=True)
-        external_file.stored_path = external_file.uploaded_file.name
-        external_file.save(update_fields=['stored_path'])
-        return external_file
-
-    def test_ftp_schema_normalises_surcharge_percentage(self):
-        rows, warnings = parse_fuel_rows(FTP_VALID_CSV)
-        self.assertEqual(warnings, [])
-        self.assertEqual(rows[0].source_format, 'FTP')
-        self.assertEqual(rows[0].master_rate, '1420')
-        self.assertEqual(rows[0].source_carrier, 'TEAMEX')
-        self.assertEqual(rows[0].source_type, 'PRICE')
-        self.assertEqual(rows[0].rate, Decimal('0.429'))
-
-    def test_ftp_validation_matches_carrier_without_changing_operational_fuel(self):
-        external_file = self.create_ftp_file()
-        summary = validate_fuel_file(external_file, actor=self.user)
-        self.config.refresh_from_db()
-        external_file.refresh_from_db()
-        self.assertEqual(external_file.status, 'VALIDATED')
-        self.assertEqual(summary['source_format'], 'FTP')
-        self.assertEqual(summary['configs_matched'], 1)
-        self.assertEqual(summary['carrier_checks'][0]['result'], 'PASS')
-        self.assertEqual(self.config.fuel_levy, Decimal('0.080000'))
-
-    def test_ftp_validation_rejects_carrier_mismatch(self):
-        content = b"rate_no,carrier,name,surcharge,type\n1420,TNT,Wrong carrier,42.90,PRICE\n"
-        external_file = self.create_ftp_file(content)
-        with self.assertRaisesMessage(FuelImportError, 'carrier mismatch'):
-            validate_fuel_file(external_file, actor=self.user)
-        external_file.refresh_from_db()
-        self.config.refresh_from_db()
-        self.assertEqual(external_file.status, 'VALIDATION_FAILED')
-        self.assertEqual(self.config.fuel_levy, Decimal('0.080000'))
-
-    def test_ftp_validation_rejects_unsupported_type_for_used_ratecard(self):
-        content = b"rate_no,carrier,name,surcharge,type\n1420,TEAMEX,Wrong type,42.90,SELECT\n"
-        external_file = self.create_ftp_file(content)
-        with self.assertRaisesMessage(FuelImportError, 'unsupported fuel type SELECT'):
-            validate_fuel_file(external_file, actor=self.user)
-        self.config.refresh_from_db()
-        self.assertEqual(self.config.fuel_levy, Decimal('0.080000'))
-
-    def test_ftp_unused_ratecard_is_reported_but_does_not_block(self):
-        content = b"rate_no,carrier,name,surcharge,type\n1420,TEAMEX,Used,42.90,PRICE\n9999,OTHER,Unused,15.00,SELECT\n"
-        external_file = self.create_ftp_file(content)
-        summary = validate_fuel_file(external_file, actor=self.user)
-        self.assertEqual(external_file.status, 'VALIDATED')
-        self.assertIn('9999', summary['ratecards_not_found_in_django'])
-        self.assertTrue(any('unsupported fuel type SELECT' in w for w in summary['warnings']))
-
-    def test_ftp_activation_uses_ftp_provenance_and_existing_activation_flow(self):
-        external_file = self.create_ftp_file()
-        validate_fuel_file(external_file, actor=self.user)
-        activate_fuel_file(external_file, actor=self.user)
-        self.config.refresh_from_db()
-        self.assertEqual(self.config.fuel_levy, Decimal('0.429'))
-        self.assertEqual(self.config.fuel_levy_source, 'FTP_DROP')
-        self.assertEqual(self.config.fuel_data_file_id, external_file.pk)
-
-    def test_ftp_snapshot_is_idempotent_and_does_not_delete_source(self):
-        source = Path(self.media_dir.name) / 'fuel.csv'
-        source.write_bytes(FTP_VALID_CSV)
-        with override_settings(FTP_UPLOADED_DATA_DIR=self.media_dir.name):
-            first, created_first = snapshot_ftp_fuel_file(client=self.client_obj, filename='fuel.csv')
-            second, created_second = snapshot_ftp_fuel_file(client=self.client_obj, filename='fuel.csv')
-        self.assertTrue(created_first)
-        self.assertFalse(created_second)
-        self.assertEqual(first.pk, second.pk)
-        self.assertEqual(first.source_method, 'FTP_DROP')
-        self.assertTrue(source.exists())
-        self.assertNotEqual(Path(first.uploaded_file.path).resolve(), source.resolve())
-
-    def test_process_uploaded_fuel_command_validates_only_and_never_activates(self):
-        other_carrier = Carrier.objects.create(code='KTI', name='KTI')
-        other_service = CarrierService.objects.create(carrier=other_carrier, service_code='GENERAL')
-        ClientCarrierConfig.objects.create(
-            client=self.client_obj,
-            carrier_service=other_service,
-            ratecard='715',
-            fuel_levy=Decimal('0.210000'),
-            fuel_levy_source='LEGACY_WORKBOOK',
-        )
-
-        source = Path(self.media_dir.name) / 'fuel.csv'
-        source.write_bytes(FTP_VALID_CSV)
-        output = StringIO()
-        with override_settings(FTP_UPLOADED_DATA_DIR=self.media_dir.name):
-            call_command('process_uploaded_fuel', '--client', 'STH', stdout=output)
-        self.config.refresh_from_db()
-        external_file = ExternalDataFile.objects.get(source_method='FTP_DROP')
-        rendered = output.getvalue()
-        self.assertEqual(external_file.status, 'VALIDATED')
-        self.assertEqual(self.config.fuel_levy, Decimal('0.080000'))
-        self.assertIn('MATCHED CLIENT CONFIGURATIONS', rendered)
-        self.assertIn('TEAMEX', rendered)
-        self.assertIn('8.00%', rendered)
-        self.assertIn('42.90%', rendered)
-        self.assertIn('CLIENT CONFIGURATIONS MISSING FROM SOURCE', rendered)
-        self.assertIn('KTI', rendered)
-        self.assertIn('715', rendered)
-        self.assertIn('PRESERVE EXISTING', rendered)
-        self.assertIn('NO FUEL RATES WERE ACTIVATED', rendered)
-
-    def test_process_uploaded_fuel_reuses_validated_summary_and_prints_preview(self):
-        source = Path(self.media_dir.name) / 'fuel.csv'
-        source.write_bytes(FTP_VALID_CSV)
-        first_output = StringIO()
-        second_output = StringIO()
-        with override_settings(FTP_UPLOADED_DATA_DIR=self.media_dir.name):
-            call_command('process_uploaded_fuel', '--client', 'STH', stdout=first_output)
-            call_command('process_uploaded_fuel', '--client', 'STH', stdout=second_output)
-
-        self.config.refresh_from_db()
-        self.assertEqual(self.config.fuel_levy, Decimal('0.080000'))
-        rendered = second_output.getvalue()
-        self.assertIn('No new snapshot created', rendered)
-        self.assertIn('Reusing the existing validation summary for review.', rendered)
-        self.assertIn('MATCHED CLIENT CONFIGURATIONS', rendered)
-        self.assertIn('42.90%', rendered)
-        self.assertIn('NO FUEL RATES WERE ACTIVATED', rendered)
-
-    def test_process_uploaded_fuel_revalidates_identical_failed_snapshot(self):
-        source = Path(self.media_dir.name) / 'fuel.csv'
-        source.write_bytes(FTP_VALID_CSV)
-        with override_settings(FTP_UPLOADED_DATA_DIR=self.media_dir.name):
-            external_file, created = snapshot_ftp_fuel_file(client=self.client_obj, filename='fuel.csv')
-            self.assertTrue(created)
-            external_file.status = 'VALIDATION_FAILED'
-            external_file.save(update_fields=['status'])
-            output = StringIO()
-            call_command('process_uploaded_fuel', '--client', 'STH', stdout=output)
-        external_file.refresh_from_db()
-        self.config.refresh_from_db()
-        self.assertEqual(external_file.status, 'VALIDATED')
-        self.assertEqual(self.config.fuel_levy, Decimal('0.080000'))
-        self.assertIn('Re-validating the existing snapshot', output.getvalue())

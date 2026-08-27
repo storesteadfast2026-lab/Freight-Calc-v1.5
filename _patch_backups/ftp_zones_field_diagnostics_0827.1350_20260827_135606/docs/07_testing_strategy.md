@@ -203,3 +203,11 @@ This change does not touch freight calculation logic, FreightZone, FreightRate, 
 ## FTP postcodes cross-validation regression - 2026-08-27
 
 Targeted tests cover exact FreightZone evidence, likely alias detection, postcode conflicts, read-only behaviour, and re-validation of an existing Phase 1 snapshot when its stored summary predates cross-validation. Imports regression remains the mandatory test gate for this patch; the full Django suite can be run separately after the operational postcodes activation design is approved.
+
+## FTP Zones validation regression - 2026-08-27
+
+Automated coverage for the Zones validation adapter includes required schema, index/index2 contracts, exact duplicate reporting, preservation of raw short Australian postcodes for review, Suburb-reference review, existing-vs-add delta classification, ambiguous carrier-service mapping, snapshot/SHA idempotency, source preservation, and proof that the management command does not modify operational `FreightZone` data.
+
+## Zones rate-driven service mapping regression - 2026-08-27
+
+Zones import regression must prove that: one source row can expand to multiple configured services when each has a matching FreightRate zone; only rate-applicable services are selected; no matching service rate becomes `REVIEW_NO_RATE_ZONE`; validation remains idempotent and read-only; and service names are never hard-coded into the importer.
