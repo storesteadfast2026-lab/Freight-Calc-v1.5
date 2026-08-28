@@ -2,6 +2,8 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.clients.models import Client
 from apps.imports.services.postcodes import (
+    POSTCODES_ACTIVATION_POLICY,
+    POSTCODES_POLICY_VERSION,
     PostcodesImportError,
     snapshot_ftp_postcodes_file,
     uploaded_data_root,
@@ -11,8 +13,8 @@ from apps.imports.services.postcodes import (
 
 class Command(BaseCommand):
     help = (
-        'Snapshot and validate uploaded_data/postcodes.csv. '
-        'Phase 2 adds cross-validation against current Django FreightZone data. It remains validation-only.'
+        'Snapshot and validate uploaded_data/postcodes.csv using the ADD-ONLY policy. '
+        'Validation never changes the operational Suburb table.'
     )
 
     def add_arguments(self, parser):
@@ -37,16 +39,21 @@ class Command(BaseCommand):
     def _write_summary(self, external_file, summary):
         self.stdout.write(self.style.SUCCESS(f'FTP postcodes file #{external_file.pk} validated.'))
         self.stdout.write(f'Source format: {summary.get("source_format")}')
+        self.stdout.write(f'Policy version: {summary.get("policy_version")}')
+        self.stdout.write(f'Activation policy: {summary.get("activation_policy")}')
         self.stdout.write(f'Rows read: {summary.get("rows_read", 0)}')
-        self.stdout.write(f'Australian candidate rows: {summary.get("candidate_rows", 0)}')
+        self.stdout.write(f'Valid Australian rows: {summary.get("candidate_rows", 0)}')
         self.stdout.write(f'Excluded source rows: {summary.get("excluded_rows_count", 0)}')
-        self.stdout.write(f'Already present in Django: {summary.get("existing_matches", 0)}')
-        self.stdout.write(f'Rows that would be added: {summary.get("would_add", 0)}')
-        self.stdout.write(f'ADD candidates with exact FreightZone evidence: {summary.get("add_candidates", 0)}')
-        self.stdout.write(f'Review - likely alias/spelling variant: {summary.get("review_alias_likely", 0)}')
-        self.stdout.write(f'Review - postcode conflict: {summary.get("review_postcode_conflict", 0)}')
-        self.stdout.write(f'Review - no exact FreightZone evidence: {summary.get("review_no_exact_zone", 0)}')
-        self.stdout.write(f'Current Django rows not in source: {summary.get("current_not_in_source", 0)}')
+        self.stdout.write(
+            'Existing master rows confirmed in current source: '
+            f'{summary.get("existing_confirmed_in_current_source", 0)}'
+        )
+        self.stdout.write(f'NEW rows eligible for ADD: {summary.get("new_rows_to_add", 0)}')
+        self.stdout.write(
+            'Existing master rows not in current source: '
+            f'{summary.get("existing_not_in_current_source_preserved", 0)} -> PRESERVE EXISTING'
+        )
+        self.stdout.write(f'Existing master origin: {summary.get("existing_master_origin", "-")}')
         self.stdout.write(
             'Suburb/state groups with multiple postcodes: '
             f'{summary.get("multi_postcode_suburb_state_groups", 0)} (allowed)'
@@ -70,65 +77,54 @@ class Command(BaseCommand):
                 ],
             )
 
-        cross_validation = summary.get('cross_validation_preview') or []
-        if cross_validation:
+        new_rows = summary.get('new_rows_preview') or []
+        if new_rows:
             self.stdout.write('')
-            self.stdout.write('POSTCODES PHASE 2 - CROSS-VALIDATION PREVIEW')
+            self.stdout.write('NEW FROM FTP POSTCODES - ADD PREVIEW')
             self._write_table(
-                ('Suburb', 'State', 'Postcode', 'Decision', 'Zone rows', 'Carriers', 'Alias / alt postcodes'),
+                ('Suburb', 'State', 'Postcode', 'Action', 'Possible alias', 'Existing other postcode(s)'),
                 [
                     (
                         row.get('suburb', ''),
                         row.get('state', ''),
                         row.get('postcode', ''),
-                        row.get('decision', ''),
-                        row.get('exact_zone_rows', 0),
-                        ','.join(row.get('exact_zone_carriers') or []) or '-',
-                        row.get('likely_alias')
-                        or ','.join(row.get('alternate_existing_postcodes') or [])
-                        or ','.join(row.get('alternate_zone_postcodes') or [])
-                        or '-',
+                        row.get('action', ''),
+                        row.get('possible_alias') or '-',
+                        ','.join(row.get('existing_same_suburb_state_postcodes') or []) or '-',
                     )
-                    for row in cross_validation
+                    for row in new_rows
                 ],
             )
             self.stdout.write('')
-            self.stdout.write('REVIEW DETAILS')
-            for row in cross_validation:
-                if row.get('decision') != 'ADD_CANDIDATE':
-                    self.stdout.write(
-                        f"- {row.get('suburb')} {row.get('state')} {row.get('postcode')}: "
-                        f"{row.get('decision')} - {row.get('reason')}"
-                    )
+            self.stdout.write(
+                'NOTE: alias/spelling information is diagnostic only. It does not block ADD and does not rename source data.'
+            )
 
-        missing = summary.get('current_not_in_source_preview') or []
-        if missing:
+        preserved = summary.get('preserved_existing_preview') or []
+        if preserved:
             self.stdout.write('')
-            self.stdout.write('CURRENT DJANGO ROWS NOT IN SOURCE - PREVIEW')
+            self.stdout.write('EXISTING MASTER NOT IN CURRENT SOURCE - PREVIEW')
             self._write_table(
-                ('Suburb', 'State', 'Postcode', 'Phase 2 action'),
+                ('Suburb', 'State', 'Postcode', 'Action'),
                 [
-                    (row['suburb'], row['state'], row['postcode'], 'PRESERVE EXISTING')
-                    for row in missing
+                    (row['suburb'], row['state'], row['postcode'], row['action'])
+                    for row in preserved
                 ],
             )
-            if summary.get('current_not_in_source', 0) > len(missing):
+            if summary.get('existing_not_in_current_source_preserved', 0) > len(preserved):
                 self.stdout.write(
-                    f'... {summary["current_not_in_source"] - len(missing)} more row(s) not shown.'
+                    f'... {summary["existing_not_in_current_source_preserved"] - len(preserved)} more row(s) not shown.'
                 )
 
         for warning in summary.get('warnings', []):
             self.stdout.write(self.style.WARNING(f'WARNING: {warning}'))
 
         self.stdout.write('')
+        self.stdout.write(self.style.WARNING('VALIDATION ONLY. THE SUBURB MASTER WAS NOT CHANGED.'))
         self.stdout.write(
             self.style.WARNING(
-                'VALIDATION ONLY. NO SUBURBS OR POSTCODES WERE ADDED, UPDATED OR DELETED.'
-            )
-        )
-        self.stdout.write(
-            self.style.WARNING(
-                'PHASE 2 HAS NO ACTIVATION COMMAND. Only ADD_CANDIDATE rows may become eligible for future add-only activation after review.'
+                'ADD-ONLY POLICY: existing rows are never updated, renamed or deleted. '
+                'Only NEW source triplets are eligible for explicit activation.'
             )
         )
 
@@ -157,18 +153,19 @@ class Command(BaseCommand):
                         f'#{external_file.pk} with status {external_file.status}.'
                     )
                 )
-                if external_file.status in {'VALIDATED', 'ACTIVE', 'ROLLED_BACK', 'ARCHIVED'}:
-                    summary = external_file.validation_summary or {}
-                    if (
-                        summary.get('source_format') == 'FTP_POSTCODES'
-                        and summary.get('cross_validation_version') == 2
-                    ):
-                        self.stdout.write('Reusing the existing validation summary (Phase 2) for review.')
-                        self._write_summary(external_file, summary)
-                        return
-                    if summary.get('source_format') == 'FTP_POSTCODES':
-                        self.stdout.write('Existing summary predates Phase 2 cross-validation.')
-                self.stdout.write('Re-validating the existing snapshot.')
+                summary = external_file.validation_summary or {}
+                if (
+                    external_file.status in {'VALIDATED', 'ACTIVE', 'ROLLED_BACK', 'ARCHIVED'}
+                    and summary.get('source_format') == 'FTP_POSTCODES'
+                    and summary.get('policy_version') == POSTCODES_POLICY_VERSION
+                    and summary.get('activation_policy') == POSTCODES_ACTIVATION_POLICY
+                ):
+                    self.stdout.write('Reusing the existing ADD-ONLY validation summary for review.')
+                    self._write_summary(external_file, summary)
+                    return
+                if summary.get('source_format') == 'FTP_POSTCODES':
+                    self.stdout.write('Existing summary predates the current ADD-ONLY Postcodes policy.')
+                self.stdout.write('Re-validating the existing snapshot with the current policy.')
 
             summary = validate_postcodes_file(external_file)
         except PostcodesImportError as exc:
