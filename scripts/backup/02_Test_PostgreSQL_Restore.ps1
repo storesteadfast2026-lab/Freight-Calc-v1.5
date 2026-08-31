@@ -66,7 +66,6 @@ try {
     Write-Host "Dump          : $DumpPath"
     Write-Host "Temporary DB  : $testDb"
     Write-Host "Production DB : WILL NOT BE MODIFIED"
-    Write-Host "GitHub        : WILL NOT BE MODIFIED"
     Write-Host "Log           : $logPath"
 
     Write-Host "`n=== COPY DUMP INTO DATABASE CONTAINER ==="
@@ -146,7 +145,6 @@ SELECT 'external_data_files=' || count(*) FROM public.imports_externaldatafile;
     Write-Host "`n=== RESTORE TEST PASSED ==="
     Write-Host "The dump restored successfully into an isolated database."
     Write-Host "Production database was NOT modified."
-    Write-Host "GitHub was NOT modified."
 }
 finally {
     $previous = $ErrorActionPreference

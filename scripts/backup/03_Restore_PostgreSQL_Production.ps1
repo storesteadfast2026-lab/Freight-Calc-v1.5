@@ -45,7 +45,6 @@ Write-Host " PRODUCTION POSTGRESQL RESTORE"
 Write-Host "============================================================"
 Write-Host ""
 Write-Host "WARNING: THIS OPERATION CHANGES THE PRODUCTION DATABASE."
-Write-Host "GitHub will NOT be modified."
 Write-Host ""
 Write-Host "Production DB : $DbName"
 Write-Host "Restore dump  : $DumpPath"
@@ -112,7 +111,6 @@ Database       : $DbName
 Dump           : $emergencyLocal
 SHA256         : $emergencyHash
 Requested dump : $DumpPath
-GitHub         : NOT MODIFIED
 "@ | Set-Content -Path (Join-Path $emergencyFolder "PRE_RESTORE_MANIFEST.txt") -Encoding utf8
 
     docker compose exec -T $DbService rm -f $emergencyContainer
@@ -196,7 +194,6 @@ SELECT 'external_data_files=' || count(*) FROM public.imports_externaldatafile;
     Write-Host "Active DB        : $DbName"
     Write-Host "Previous DB kept : $previousDb"
     Write-Host "Emergency backup : $emergencyLocal"
-    Write-Host "GitHub            : NOT MODIFIED"
     Write-Host ""
     Write-Host "Do not delete '$previousDb' until functional validation"
     Write-Host "and a fresh post-restore backup are complete."

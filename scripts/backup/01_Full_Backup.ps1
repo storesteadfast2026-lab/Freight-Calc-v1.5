@@ -46,7 +46,6 @@ try {
     Write-Host "============================================================"
     Write-Host "Project       : $ProjectRoot"
     Write-Host "Backup folder : $backupFolder"
-    Write-Host "GitHub        : READ-ONLY. No push is performed."
 
     Write-Host "`n=== PRE-FLIGHT ==="
     docker compose ps
@@ -151,9 +150,6 @@ SELECT 'external_data_files=' || count(*) FROM public.imports_externaldatafile;
     $commit = (git rev-parse HEAD).Trim()
     Assert-ExitCode "git rev-parse HEAD"
 
-    $remoteUrl = (git remote get-url origin).Trim()
-    Assert-ExitCode "git remote get-url origin"
-
     $bundlePath = Join-Path $gitFolder "Freight-Calc-v1.5_$timestamp.bundle"
 
     git bundle create $bundlePath --all
@@ -162,31 +158,10 @@ SELECT 'external_data_files=' || count(*) FROM public.imports_externaldatafile;
     git bundle verify $bundlePath
     Assert-ExitCode "git bundle verify"
 
-    Write-Host "`n=== GITHUB READ-ONLY COMPARISON ==="
-    $remoteBranchHash = ""
-    $githubState = "NOT_CHECKED"
-
-    if (-not [string]::IsNullOrWhiteSpace($branch)) {
-        $remoteLine = git ls-remote origin "refs/heads/$branch"
-        Assert-ExitCode "git ls-remote"
-
-        if ($remoteLine) {
-            $remoteBranchHash = (($remoteLine -split "\s+")[0]).Trim()
-            if ($remoteBranchHash -eq $commit) {
-                $githubState = "LOCAL_AND_GITHUB_MATCH"
-            } else {
-                $githubState = "LOCAL_AND_GITHUB_DIFFER"
-            }
-        } else {
-            $githubState = "BRANCH_NOT_FOUND_ON_GITHUB"
-        }
-    }
-
-    Write-Host "Local branch : $branch"
-    Write-Host "Local commit : $commit"
-    Write-Host "GitHub hash  : $remoteBranchHash"
-    Write-Host "Comparison   : $githubState"
-    Write-Host "No GitHub modification was performed."
+    Write-Host "`n=== LOCAL GIT RECOVERY BUNDLE ==="
+    Write-Host "Branch : $branch"
+    Write-Host "Commit : $commit"
+    Write-Host "Bundle : $bundlePath"
 
     Write-Host "`n=== SHA256 CHECKSUMS ==="
     $dumpHash = Get-Sha256 $dumpLocal
@@ -231,15 +206,11 @@ GIT
 ---
 Branch             : $branch
 Commit             : $commit
-Remote             : $remoteUrl
 Git bundle         : $bundlePath
 Bundle SHA256      : $bundleHash
-GitHub comparison  : $githubState
-GitHub branch hash : $remoteBranchHash
 
 SAFETY
 ------
-- GitHub was NOT modified.
 - PostgreSQL production data was NOT modified.
 - This folder is an independent local recovery point.
 - Keep a second copy on independent storage when possible.
@@ -267,7 +238,6 @@ SAFETY
 
     Write-Host "`n=== BACKUP COMPLETED SUCCESSFULLY ==="
     Write-Host "Recovery point : $backupFolder"
-    Write-Host "GitHub         : NOT MODIFIED"
     Write-Host "Production DB  : NOT MODIFIED"
 }
 finally {

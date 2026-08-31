@@ -11,13 +11,38 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Test-IsAdministrator {
+    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole(
+        [System.Security.Principal.WindowsBuiltInRole]::Administrator
+    )
+}
+
+function Write-TaskSummary {
+    param([string]$Name)
+
+    Write-Host "`n=== TASK DETAILS ==="
+    Get-ScheduledTask -TaskName $Name -ErrorAction Stop |
+        Select-Object TaskName, State, Description
+
+    Write-Host "`n=== NEXT RUN INFORMATION ==="
+    Get-ScheduledTaskInfo -TaskName $Name -ErrorAction Stop |
+        Select-Object LastRunTime, LastTaskResult, NextRunTime
+}
+
 $backupScript = Join-Path $ScriptsFolder "01_Full_Backup.ps1"
+
 if (-not (Test-Path $backupScript)) {
     throw "Backup script not found: $backupScript"
 }
 
 if ($DailyTime -notmatch '^(?:[01]\d|2[0-3]):[0-5]\d$') {
-    throw "DailyTime must use HH:mm format, for example 19:00."
+    throw "DailyTime must use 24-hour HH:mm format, for example 19:00."
+}
+
+if (-not (Test-Path $ProjectRoot)) {
+    throw "Project root does not exist: $ProjectRoot"
 }
 
 $timeParts = $DailyTime.Split(":")
@@ -25,7 +50,27 @@ $hour = [int]$timeParts[0]
 $minute = [int]$timeParts[1]
 $triggerTime = (Get-Date).Date.AddHours($hour).AddMinutes($minute)
 
-$psArgs = @(
+$currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+$isAdministrator = Test-IsAdministrator
+
+Write-Host "============================================================"
+Write-Host " INSTALL DAILY FREIGHT CALCULATOR BACKUP TASK"
+Write-Host "============================================================"
+Write-Host "Task name       : $TaskName"
+Write-Host "Windows user    : $currentUser"
+Write-Host "Daily time      : $DailyTime"
+Write-Host "Backup script   : $backupScript"
+Write-Host "Project root    : $ProjectRoot"
+Write-Host "Backup root     : $BackupRoot"
+Write-Host "Administrator   : $isAdministrator"
+Write-Host ""
+Write-Host "IMPORTANT:"
+Write-Host "- Docker Desktop and the project containers must be available when it runs."
+Write-Host "- The task runs only while this Windows user is logged on."
+Write-Host "- The task is registered with LIMITED user privileges by design."
+Write-Host "- Administrator access is not required for the default configuration."
+
+$argumentParts = @(
     "-NoProfile",
     "-ExecutionPolicy", "Bypass",
     "-File", "`"$backupScript`"",
@@ -34,10 +79,13 @@ $psArgs = @(
 )
 
 if (-not [string]::IsNullOrWhiteSpace($SecondaryCopyPath)) {
-    $psArgs += @("-SecondaryCopyPath", "`"$SecondaryCopyPath`"")
+    $argumentParts += @(
+        "-SecondaryCopyPath",
+        "`"$SecondaryCopyPath`""
+    )
 }
 
-$argumentString = $psArgs -join " "
+$argumentString = $argumentParts -join " "
 
 $action = New-ScheduledTaskAction `
     -Execute "powershell.exe" `
@@ -53,40 +101,37 @@ $settings = New-ScheduledTaskSettingsSet `
     -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Hours 2)
 
-$currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+# LIMITED + Interactive avoids unnecessary elevation and is appropriate for
+# Docker Desktop running in the signed-in user's Windows session.
 $principal = New-ScheduledTaskPrincipal `
     -UserId $currentUser `
     -LogonType Interactive `
-    -RunLevel Highest
+    -RunLevel Limited
 
-Write-Host "============================================================"
-Write-Host " INSTALL DAILY FREIGHT CALCULATOR BACKUP TASK"
-Write-Host "============================================================"
-Write-Host "Task name : $TaskName"
-Write-Host "User      : $currentUser"
-Write-Host "Time      : $DailyTime"
-Write-Host "Script    : $backupScript"
-Write-Host ""
-Write-Host "IMPORTANT:"
-Write-Host "- This task does NOT push to GitHub."
-Write-Host "- Docker Desktop / Docker services must be available when it runs."
-Write-Host "- This configuration uses the current interactive Windows user."
+Write-Host "`n=== REGISTERING TASK ==="
 
-Register-ScheduledTask `
-    -TaskName $TaskName `
-    -Action $action `
-    -Trigger $trigger `
-    -Settings $settings `
-    -Principal $principal `
-    -Description "Daily Freight Calculator recovery-point backup. No GitHub push." `
-    -Force | Out-Null
+try {
+    Register-ScheduledTask `
+        -TaskName $TaskName `
+        -Action $action `
+        -Trigger $trigger `
+        -Settings $settings `
+        -Principal $principal `
+        -Force `
+        -ErrorAction Stop | Out-Null
+}
+catch {
+    Write-Host ""
+    Write-Host "ERROR - The scheduled task could not be registered."
+    Write-Host "Windows message: $($_.Exception.Message)"
+    Write-Host ""
+    Write-Host "No backup task was installed."
+    throw
+}
 
-Write-Host "`n=== TASK INSTALLED ==="
-Get-ScheduledTask -TaskName $TaskName |
-    Select-Object TaskName, State, Description
+Write-Host "OK - Scheduled task registered successfully."
 
-Write-Host "`n=== NEXT RUN INFORMATION ==="
-Get-ScheduledTaskInfo -TaskName $TaskName |
-    Select-Object LastRunTime, LastTaskResult, NextRunTime
+Write-TaskSummary -Name $TaskName
 
-Write-Host "`nGitHub was NOT modified."
+Write-Host "`n=== COMPLETE ==="
+Write-Host "Daily backup automation is installed."
