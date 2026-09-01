@@ -19,6 +19,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
 from apps.clients.models import Client
+from apps.imports.admin_ftp_inbox import FtpInboxAdminMixin
 from apps.imports.forms import (
     ExternalDataFileAdminForm,
     FetchFuelForm,
@@ -479,7 +480,7 @@ class ExternalDataReviewItemInline(admin.TabularInline):
         )
 
 @admin.register(ExternalDataFile)
-class ExternalDataFileAdmin(PostcodesApplyAdminMixin, admin.ModelAdmin):
+class ExternalDataFileAdmin(FtpInboxAdminMixin, PostcodesApplyAdminMixin, admin.ModelAdmin):
     change_form_template = 'admin/imports/externaldatafile/change_form_with_postcodes_apply.html'
     form = ExternalDataFileAdminForm
     change_list_template = 'admin/imports/externaldatafile/change_list.html'
