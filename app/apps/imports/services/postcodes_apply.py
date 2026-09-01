@@ -4,10 +4,14 @@ import copy
 import re
 import uuid
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit.models import AuditEvent
+
 from apps.imports.models import ExternalDataFile, ExternalDataReviewItem
+from apps.imports.services.audit import create_audit_event
 from apps.imports.services.review import sync_postcodes_review_items
 from apps.locations.models import Suburb
 
@@ -165,11 +169,16 @@ def _append_batch(external_file, batch):
     summary = copy.deepcopy(external_file.import_summary or {}); batches = list(summary.get('review_apply_batches') or []); batches.append(batch); summary['review_apply_batches'] = batches; external_file.import_summary = summary; external_file.save(update_fields=['import_summary'])
 
 @transaction.atomic
-def apply_approved_postcodes(external_file_id, actor=None):
+def apply_approved_postcodes(external_file_id, actor=None, request=None):
     plan = build_postcodes_apply_plan(external_file_id, lock=True)
     if plan['blockers']: raise PostcodesApplyBlocked('Approved postcode changes are blocked. Resolve the blockers before applying.', plan=plan)
     if plan['approved_count'] == 0: raise PostcodesApplyBlocked('There are no approved postcode Review decisions to apply.', plan=plan)
     external_file = ExternalDataFile.objects.select_for_update().get(pk=external_file_id)
+    if plan['change_count'] == 0 and _latest_open_batch(external_file):
+        raise PostcodesApplyBlocked(
+            'All approved postcode changes are already applied. No database changes are required.',
+            plan=plan,
+        )
     now = timezone.now(); batch_id = uuid.uuid4().hex; actor_name = _actor_name(actor); applied_items = []
     item_map = {i.pk:i for i in ExternalDataReviewItem.objects.select_for_update().filter(external_file=external_file,is_current=True)}
     for ip in plan['items']:
@@ -194,7 +203,14 @@ def apply_approved_postcodes(external_file_id, actor=None):
         if actor is not None and getattr(actor,'pk',None): item.reviewed_by = actor
         item.save(update_fields=['applied_at','applied_result','reviewed_by','updated_at']); applied_items.append(result)
     batch = {'batch_id':batch_id,'applied_at':now.isoformat(),'actor':actor_name,'approved_count':plan['approved_count'],'change_count':plan['change_count'],'no_change_count':plan['no_change_count'],'items':applied_items,'rolled_back_at':None,'rolled_back_by':''}
-    _append_batch(external_file,batch); sync_postcodes_review_items(external_file)
+    _append_batch(external_file,batch)
+    ensure_postcodes_apply_audit_event(
+        external_file.pk,
+        actor=actor,
+        request=request,
+        batch_id=batch_id,
+    )
+    sync_postcodes_review_items(external_file)
     return {'batch_id':batch_id,'approved_count':plan['approved_count'],'change_count':plan['change_count'],'no_change_count':plan['no_change_count']}
 
 def _latest_open_batch(external_file):
@@ -228,7 +244,7 @@ def build_postcodes_rollback_plan(external_file_id, lock=False):
     return plan
 
 @transaction.atomic
-def rollback_latest_postcodes_apply(external_file_id, actor=None):
+def rollback_latest_postcodes_apply(external_file_id, actor=None, request=None):
     plan=build_postcodes_rollback_plan(external_file_id,lock=True)
     if plan['blockers']: raise PostcodesApplyBlocked('The latest postcode Apply batch cannot be rolled back safely.',plan=plan)
     external_file=ExternalDataFile.objects.select_for_update().get(pk=external_file_id); batch=_latest_open_batch(external_file); actor_name=_actor_name(actor); now=timezone.now()
@@ -251,4 +267,167 @@ def rollback_latest_postcodes_apply(external_file_id, actor=None):
     for review_item in ExternalDataReviewItem.objects.select_for_update().filter(pk__in=ids):
         result=copy.deepcopy(review_item.applied_result or {})
         if result.get('batch_id') == batch.get('batch_id'): result['rolled_back_at']=now.isoformat(); result['rolled_back_by']=actor_name; review_item.applied_result=result; review_item.save(update_fields=['applied_result','updated_at'])
-    sync_postcodes_review_items(external_file); return {'batch_id':batch.get('batch_id'),'rolled_back_at':now.isoformat()}
+    create_audit_event(
+        event_type='POSTCODES_REVIEW_ROLLED_BACK',
+        message=(
+            f'Postcodes Review Apply batch {batch.get("batch_id")} rolled back '
+            f'for {external_file.client.code}.'
+        ),
+        actor=actor,
+        client=external_file.client,
+        external_file=external_file,
+        severity='WARNING',
+        metadata={
+            'source_file': external_file.original_filename,
+            'sha256': external_file.sha256,
+            'apply_batch_id': batch.get('batch_id'),
+            'applied_at': batch.get('applied_at'),
+            'rolled_back_at': now.isoformat(),
+            'applied_change_count': batch.get('change_count', 0),
+            'approved_count': batch.get('approved_count', 0),
+            'database_updated': True,
+        },
+        request=request,
+    )
+    sync_postcodes_review_items(external_file)
+    return {'batch_id':batch.get('batch_id'),'rolled_back_at':now.isoformat()}
+
+
+def _apply_audit_metadata(external_file, batch):
+    return {
+        'source_file': external_file.original_filename,
+        'file_type': external_file.file_type,
+        'source_method': external_file.source_method,
+        'sha256': external_file.sha256,
+        'batch_id': batch.get('batch_id'),
+        'applied_at': batch.get('applied_at'),
+        'original_actor': batch.get('actor', ''),
+        'approved_count': batch.get('approved_count', 0),
+        'change_count': batch.get('change_count', 0),
+        'no_change_count': batch.get('no_change_count', 0),
+        'database_updated': bool(batch.get('change_count', 0)),
+        'items': list(batch.get('items') or []),
+    }
+
+
+def _batch_actor(batch):
+    username = _norm(batch.get('actor'))
+    if not username:
+        return None
+    return get_user_model().objects.filter(username=username).first()
+
+
+def _find_apply_audit_event(external_file, batch_id):
+    if not batch_id:
+        return None
+    return (
+        AuditEvent.objects.filter(
+            external_file=external_file,
+            event_type='POSTCODES_REVIEW_APPLIED',
+            metadata__batch_id=batch_id,
+        )
+        .order_by('pk')
+        .first()
+    )
+
+
+def ensure_postcodes_apply_audit_event(
+    external_file_id,
+    actor=None,
+    request=None,
+    batch_id=None,
+):
+    """
+    Ensure one AuditEvent exists for a successful Postcodes Apply batch.
+
+    This is idempotent and is also used to backfill the Apply batch that was
+    created before Postcodes Review was connected to Audit Events.
+    """
+    external_file = ExternalDataFile.objects.get(pk=external_file_id)
+
+    if batch_id:
+        batch = next(
+            (
+                stored
+                for stored in reversed(
+                    list(
+                        (external_file.import_summary or {}).get(
+                            'review_apply_batches'
+                        )
+                        or []
+                    )
+                )
+                if stored.get('batch_id') == batch_id
+                and not stored.get('rolled_back_at')
+            ),
+            None,
+        )
+    else:
+        batch = _latest_open_batch(external_file)
+
+    if not batch:
+        raise PostcodesApplyBlocked(
+            'There is no successful active Postcodes Review Apply batch to audit.'
+        )
+
+    existing = _find_apply_audit_event(external_file, batch.get('batch_id'))
+    if existing is not None:
+        return {
+            'created': False,
+            'audit_event_id': existing.pk,
+            'batch_id': batch.get('batch_id'),
+        }
+
+    audit_actor = actor or _batch_actor(batch)
+    event = create_audit_event(
+        event_type='POSTCODES_REVIEW_APPLIED',
+        message=(
+            f'Postcodes Review applied for {external_file.client.code}: '
+            f'{batch.get("change_count", 0)} database change(s), '
+            f'{batch.get("no_change_count", 0)} already applied/no-change.'
+        ),
+        actor=audit_actor,
+        client=external_file.client,
+        external_file=external_file,
+        metadata=_apply_audit_metadata(external_file, batch),
+        request=request,
+        request_id=batch.get('batch_id') or None,
+    )
+    return {
+        'created': True,
+        'audit_event_id': event.pk,
+        'batch_id': batch.get('batch_id'),
+    }
+
+
+def postcodes_review_completion(external_file_id):
+    external_file = ExternalDataFile.objects.get(pk=external_file_id)
+    plan = build_postcodes_apply_plan(external_file.pk)
+    batch = _latest_open_batch(external_file)
+    audit_event = (
+        _find_apply_audit_event(external_file, batch.get('batch_id'))
+        if batch
+        else None
+    )
+
+    completed = bool(
+        batch
+        and audit_event
+        and plan['approved_count'] > 0
+        and plan['change_count'] == 0
+        and plan['skipped_count'] == 0
+        and not plan['blockers']
+    )
+
+    return {
+        'completed': completed,
+        'batch_id': batch.get('batch_id') if batch else '',
+        'applied_at': batch.get('applied_at') if batch else '',
+        'actor': batch.get('actor') if batch else '',
+        'approved_count': plan['approved_count'],
+        'change_count': plan['change_count'],
+        'no_change_count': plan['no_change_count'],
+        'skipped_count': plan['skipped_count'],
+        'blockers': list(plan['blockers']),
+        'audit_event_id': audit_event.pk if audit_event else None,
+    }
