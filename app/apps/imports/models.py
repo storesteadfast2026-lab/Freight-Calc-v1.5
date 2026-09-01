@@ -230,3 +230,58 @@ class StockSourceRow(models.Model):
 
     def __str__(self):
         return f'{self.external_file_id}:{self.source_row_number} {self.product_code_normalized}'
+
+
+class ExternalDataReviewItem(models.Model):
+    """Generic review decision linked to one external source row."""
+
+    external_file = models.ForeignKey(
+        ExternalDataFile,
+        on_delete=models.CASCADE,
+        related_name='external_data_review_items',
+    )
+    row_key = models.CharField(max_length=255)
+    entity_type = models.CharField(max_length=50, blank=True)
+    source_data = models.JSONField(default=dict, blank=True)
+    current_data = models.JSONField(default=dict, blank=True)
+    diagnostic_data = models.JSONField(default=dict, blank=True)
+    proposed_action = models.CharField(max_length=50, blank=True)
+    decision = models.CharField(max_length=50, default='PENDING')
+    notes = models.TextField(blank=True)
+    corrected_suburb = models.CharField(max_length=120, blank=True)
+    corrected_state = models.CharField(max_length=10, blank=True)
+    corrected_postcode = models.CharField(max_length=10, blank=True)
+    selected_historical_suburb_id = models.BigIntegerField(null=True, blank=True)
+    is_current = models.BooleanField(default=True, db_index=True)
+
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='external_data_reviews',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    applied_result = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['external_file', 'row_key']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['external_file', 'row_key'],
+                name='imports_review_file_row_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['external_file', 'decision', 'is_current'],
+                name='imp_review_file_dec_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.external_file_id}:{self.row_key} {self.decision}'

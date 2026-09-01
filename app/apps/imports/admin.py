@@ -1,9 +1,11 @@
+from .admin_postcodes_apply import PostcodesApplyAdminMixin
 import json
 import mimetypes
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import urlencode
 
+from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
@@ -12,6 +14,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
@@ -23,7 +26,12 @@ from apps.imports.forms import (
     FuelRollbackForm,
     SourceUploadForm,
 )
-from apps.imports.models import ExternalDataFile, ProductSourceRow, StockSourceRow
+from apps.imports.models import (
+    ExternalDataFile,
+    ExternalDataReviewItem,
+    ProductSourceRow,
+    StockSourceRow,
+)
 from apps.imports.services.audit import create_audit_event
 from apps.imports.services.fuel import (
     FuelImportError,
@@ -35,6 +43,7 @@ from apps.imports.services.fuel import (
     rollback_fuel_file,
     validate_fuel_file,
 )
+from apps.imports.services.review import sync_postcodes_review_items
 from apps.imports.services.product_source import validate_product_source_file
 from apps.imports.services.stock_source import validate_stock_source_file
 from apps.imports.services.xlsx_reader import SourceImportError
@@ -43,8 +52,435 @@ from apps.imports.services.xlsx_reader import SourceImportError
 REFERENCE_FILE_TYPES = {'PRODUCTS', 'STOCK'}
 
 
+
+class HistoricalMatchSelect(forms.Select):
+    """Select widget that exposes the selected historical row to Admin JavaScript."""
+
+    match_map = {}
+
+    def create_option(
+        self,
+        name,
+        value,
+        label,
+        selected,
+        index,
+        subindex=None,
+        attrs=None,
+    ):
+        option = super().create_option(
+            name,
+            value,
+            label,
+            selected,
+            index,
+            subindex=subindex,
+            attrs=attrs,
+        )
+        match = self.match_map.get(str(value))
+        if match:
+            option['attrs']['data-suburb'] = str(match.get('suburb') or '')
+            option['attrs']['data-state'] = str(match.get('state') or '')
+            option['attrs']['data-postcode'] = str(match.get('postcode') or '')
+        return option
+
+
+class PostcodesReviewControlsWidget(forms.MultiWidget):
+    template_name = 'admin/imports/widgets/postcodes_review_controls.html'
+
+    def __init__(self, attrs=None):
+        widgets = (
+            forms.TextInput(
+                attrs={
+                    'class': 'postcodes-review-note',
+                    'placeholder': 'Review note',
+                    'style': 'width:150px;',
+                }
+            ),
+            forms.TextInput(
+                attrs={
+                    'class': 'postcodes-override-suburb',
+                    'placeholder': 'Suburb',
+                    'style': 'width:125px;',
+                }
+            ),
+            forms.TextInput(
+                attrs={
+                    'class': 'postcodes-override-state',
+                    'placeholder': 'State',
+                    'maxlength': 10,
+                    'style': 'width:48px;',
+                }
+            ),
+            forms.TextInput(
+                attrs={
+                    'class': 'postcodes-override-postcode',
+                    'placeholder': 'Postcode',
+                    'maxlength': 10,
+                    'style': 'width:62px;',
+                }
+            ),
+        )
+        super().__init__(widgets, attrs)
+
+    def decompress(self, value):
+        if isinstance(value, (list, tuple)) and len(value) == 4:
+            return list(value)
+        return ['', '', '', '']
+
+
+class PostcodesReviewControlsField(forms.MultiValueField):
+    widget = PostcodesReviewControlsWidget
+
+    def __init__(self, *args, **kwargs):
+        fields = (
+            forms.CharField(required=False),
+            forms.CharField(required=False),
+            forms.CharField(required=False),
+            forms.CharField(required=False),
+        )
+        kwargs.setdefault('required', False)
+        kwargs.setdefault('require_all_fields', False)
+        super().__init__(fields=fields, *args, **kwargs)
+
+    def compress(self, data_list):
+        values = list(data_list or ['', '', '', ''])
+        while len(values) < 4:
+            values.append('')
+        return values[:4]
+
+
+class PostcodesReviewItemForm(forms.ModelForm):
+    """Compact Postcodes Review form.
+
+    postcodes.csv is authoritative. Current DB is reference/replace-target
+    metadata only. Final values are implicit from the source unless the
+    reviewer explicitly chooses Manual override.
+    """
+
+    DECISION_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('ACCEPT_SOURCE', 'Use source file'),
+        ('NEEDS_REVIEW', 'Needs review'),
+        ('MANUAL_OVERRIDE', 'Manual override'),
+    )
+
+    LEGACY_DECISION_LABELS = {
+        'KEEP': 'Legacy - Keep source (review again)',
+        'USE_EXISTING_DB': 'Legacy - Use existing DB (review again)',
+        'CORRECT_MANUALLY': 'Legacy - Correct manually (review again)',
+        'REMOVE_ADDED_ROW': 'Legacy - Remove added row (review again)',
+    }
+
+    selected_historical_suburb_id = forms.ChoiceField(
+        required=False,
+        label='Current DB',
+        widget=HistoricalMatchSelect(
+            attrs={
+                'class': 'postcodes-current-db',
+                'style': 'width:220px; max-width:220px;',
+            }
+        ),
+    )
+    decision = forms.ChoiceField(
+        choices=DECISION_CHOICES,
+        widget=forms.Select(
+            attrs={
+                'class': 'postcodes-review-decision',
+                'style': 'width:135px; max-width:135px;',
+            }
+        ),
+    )
+    review_controls = PostcodesReviewControlsField(
+        required=False,
+        label='Notes',
+    )
+
+    class Meta:
+        model = ExternalDataReviewItem
+        fields = (
+            'selected_historical_suburb_id',
+            'decision',
+        )
+
+    @staticmethod
+    def _normalise_controls(value):
+        controls = list(value or ['', '', '', ''])
+        while len(controls) < 4:
+            controls.append('')
+        return controls[:4]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        current_data = getattr(self.instance, 'current_data', None) or {}
+        matches = current_data.get('historical_matches') or []
+        labels = {
+            'EXACT_TRIPLET': 'exact',
+            'SAME_SUBURB_STATE': 'same suburb',
+            'VALIDATOR_ALIAS': 'alias',
+        }
+
+        match_map = {}
+        choices = [('', '-- Select current DB row --')]
+        for match in matches:
+            raw_id = match.get('id')
+            if raw_id is None:
+                continue
+            value = str(raw_id)
+            match_map[value] = match
+            label = '{} {} {} - {}'.format(
+                match.get('suburb') or '-',
+                match.get('state') or '-',
+                match.get('postcode') or '-',
+                labels.get(match.get('match_type'), 'match'),
+            )
+            choices.append((value, label))
+
+        selected_id = getattr(
+            self.instance,
+            'selected_historical_suburb_id',
+            None,
+        )
+        if selected_id is not None and str(selected_id) not in match_map:
+            choices.append(
+                (
+                    str(selected_id),
+                    f'Previously selected DB row #{selected_id}',
+                )
+            )
+
+        db_field = self.fields['selected_historical_suburb_id']
+        db_field.choices = choices
+        if selected_id is not None:
+            self.initial['selected_historical_suburb_id'] = str(selected_id)
+        elif match_map:
+            # UI convenience only. The first displayed Current DB candidate is
+            # preselected, but source values remain authoritative.
+            first_current_db_id = next(iter(match_map))
+            self.initial['selected_historical_suburb_id'] = first_current_db_id
+
+        if not match_map and selected_id is None:
+            db_field.choices = [('', 'No direct current DB match')]
+            db_field.disabled = True
+
+        source = getattr(self.instance, 'source_data', None) or {}
+        self.initial['review_controls'] = [
+            str(getattr(self.instance, 'notes', '') or ''),
+            str(
+                getattr(self.instance, 'corrected_suburb', '')
+                or source.get('suburb')
+                or ''
+            ),
+            str(
+                getattr(self.instance, 'corrected_state', '')
+                or source.get('state')
+                or ''
+            ),
+            str(
+                getattr(self.instance, 'corrected_postcode', '')
+                or source.get('postcode')
+                or ''
+            ),
+        ]
+
+        current_decision = str(getattr(self.instance, 'decision', '') or '')
+        allowed = {value for value, _label in self.DECISION_CHOICES}
+        if current_decision and current_decision not in allowed:
+            legacy_label = self.LEGACY_DECISION_LABELS.get(
+                current_decision,
+                f'Legacy - {current_decision} (review again)',
+            )
+            self.fields['decision'].choices = (
+                tuple(self.DECISION_CHOICES)
+                + ((current_decision, legacy_label),)
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+
+        controls = self._normalise_controls(
+            cleaned.get('review_controls')
+        )
+        note = str(controls[0] or '').strip()
+        override_suburb = str(controls[1] or '').strip().upper()
+        override_state = str(controls[2] or '').strip().upper()
+        override_postcode = str(controls[3] or '').strip()
+
+        cleaned['review_controls'] = [
+            note,
+            override_suburb,
+            override_state,
+            override_postcode,
+        ]
+
+        matches = (self.instance.current_data or {}).get('historical_matches') or []
+        matches_by_id = {
+            int(match['id']): match
+            for match in matches
+            if match.get('id') is not None
+        }
+
+        raw_selected = cleaned.get('selected_historical_suburb_id')
+        selected_id = None
+        if raw_selected not in (None, ''):
+            try:
+                selected_id = int(raw_selected)
+            except (TypeError, ValueError):
+                raise forms.ValidationError(
+                    'The selected Current DB row is invalid.'
+                )
+
+            if selected_id not in matches_by_id:
+                raise forms.ValidationError(
+                    'The selected Current DB row is no longer one of the current comparison candidates.'
+                )
+
+        decision = cleaned.get('decision')
+        source_action = str(
+            (self.instance.current_data or {}).get('source_action') or ''
+        )
+
+        if decision == 'ACCEPT_SOURCE':
+            if source_action == 'REPLACE' and selected_id is None:
+                raise forms.ValidationError(
+                    'Select the Current DB row that this source row would replace.'
+                )
+
+        if decision == 'MANUAL_OVERRIDE':
+            if not note:
+                raise forms.ValidationError(
+                    'Manual override requires a review note explaining why the authoritative source is being overridden.'
+                )
+            if not override_suburb or not override_state or not override_postcode:
+                raise forms.ValidationError(
+                    'Manual override requires final suburb, state and postcode.'
+                )
+            if source_action == 'REPLACE' and selected_id is None:
+                raise forms.ValidationError(
+                    'Select the Current DB row associated with this replacement before using Manual override.'
+                )
+
+        cleaned['selected_historical_suburb_id'] = selected_id
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        controls = self._normalise_controls(
+            self.cleaned_data.get('review_controls')
+        )
+        note = str(controls[0] or '').strip()
+        override_suburb = str(controls[1] or '').strip().upper()
+        override_state = str(controls[2] or '').strip().upper()
+        override_postcode = str(controls[3] or '').strip()
+
+        instance.notes = note
+
+        decision = self.cleaned_data.get('decision')
+        source = instance.source_data or {}
+
+        if decision == 'ACCEPT_SOURCE':
+            instance.corrected_suburb = str(
+                source.get('suburb') or ''
+            ).strip().upper()
+            instance.corrected_state = str(
+                source.get('state') or ''
+            ).strip().upper()
+            instance.corrected_postcode = str(
+                source.get('postcode') or ''
+            ).strip()
+        elif decision == 'MANUAL_OVERRIDE':
+            instance.corrected_suburb = override_suburb
+            instance.corrected_state = override_state
+            instance.corrected_postcode = override_postcode
+        else:
+            # Preserve the existing final metadata while Pending/Needs review.
+            # New review rows are already initialised from the source by sync.
+            if not instance.corrected_suburb:
+                instance.corrected_suburb = str(
+                    source.get('suburb') or ''
+                ).strip().upper()
+            if not instance.corrected_state:
+                instance.corrected_state = str(
+                    source.get('state') or ''
+                ).strip().upper()
+            if not instance.corrected_postcode:
+                instance.corrected_postcode = str(
+                    source.get('postcode') or ''
+                ).strip()
+
+        if commit:
+            instance.save()
+        return instance
+
+class ExternalDataReviewItemInline(admin.TabularInline):
+    model = ExternalDataReviewItem
+    form = PostcodesReviewItemForm
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    verbose_name = 'Review item'
+    verbose_name_plural = (
+        'Postcodes Review - postcodes.csv is authoritative'
+    )
+    fields = (
+        'source_display',
+        'selected_historical_suburb_id',
+        'source_action_display',
+        'decision',
+        'review_controls',
+    )
+    readonly_fields = (
+        'source_display',
+        'source_action_display',
+    )
+
+    class Media:
+        css = {
+            'all': ('admin/imports/postcodes_review_compact.css',)
+        }
+        js = ('admin/imports/postcodes_review_compact.js',)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(is_current=True)
+
+    @admin.display(description='Source')
+    def source_display(self, obj):
+        source = obj.source_data or {}
+        return format_html(
+            '<span class="postcodes-source-value">'
+            '<strong>{}</strong> {} <code>{}</code>'
+            '</span>',
+            source.get('suburb') or '-',
+            source.get('state') or '-',
+            source.get('postcode') or '-',
+        )
+
+    @admin.display(description='Action')
+    def source_action_display(self, obj):
+        current_data = obj.current_data or {}
+        action = str(current_data.get('source_action') or 'REVIEW').upper()
+        reason = str(current_data.get('source_action_reason') or '')
+
+        allowed = {'ADD', 'REPLACE', 'UNCHANGED', 'REVIEW', 'ALREADY_ADDED'}
+        if action not in allowed:
+            action = 'REVIEW'
+
+        badge_text = 'ADDED' if action == 'ALREADY_ADDED' else action
+        css_action = action.lower()
+        return format_html(
+            '<span class="postcodes-action-badge postcodes-action-{}" title="{}">{}</span>',
+            css_action,
+            reason,
+            badge_text,
+        )
+
 @admin.register(ExternalDataFile)
-class ExternalDataFileAdmin(admin.ModelAdmin):
+class ExternalDataFileAdmin(PostcodesApplyAdminMixin, admin.ModelAdmin):
+    change_form_template = 'admin/imports/externaldatafile/change_form_with_postcodes_apply.html'
     form = ExternalDataFileAdminForm
     change_list_template = 'admin/imports/externaldatafile/change_list.html'
     list_display = (
@@ -55,6 +491,69 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
     search_fields = ('original_filename', 'stored_path', 'sha256', 'source_url')
     date_hierarchy = 'uploaded_at'
     ordering = ('-uploaded_at',)
+
+
+    def get_inlines(self, request, obj):
+        if obj is not None and obj.file_type == 'SUBURBS':
+            return [ExternalDataReviewItemInline]
+        return []
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        if object_id:
+            external_file = self.get_object(request, object_id)
+            if external_file is not None and external_file.file_type == 'SUBURBS':
+                sync_postcodes_review_items(external_file)
+        return super().changeform_view(
+            request,
+            object_id=object_id,
+            form_url=form_url,
+            extra_context=extra_context,
+        )
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model is ExternalDataReviewItem:
+            changed_items = formset.save(commit=False)
+            now = timezone.now()
+
+            for item in changed_items:
+                if item.decision == 'PENDING':
+                    item.reviewed_by = None
+                    item.reviewed_at = None
+                else:
+                    item.reviewed_by = request.user
+                    item.reviewed_at = now
+                item.save()
+
+            formset.save_m2m()
+
+            if changed_items:
+                external_file = formset.instance
+                decision_counts = {}
+                for decision in ExternalDataReviewItem.objects.filter(
+                    external_file=external_file,
+                    is_current=True,
+                ).values_list('decision', flat=True):
+                    decision_counts[decision] = decision_counts.get(decision, 0) + 1
+
+                create_audit_event(
+                    event_type='EXTERNAL_DATA_REVIEW_UPDATED',
+                    message=(
+                        f'External data review updated for '
+                        f'{external_file.client.code} {external_file.original_filename}.'
+                    ),
+                    actor=request.user,
+                    client=external_file.client,
+                    external_file=external_file,
+                    metadata={
+                        'file_type': external_file.file_type,
+                        'decisions': decision_counts,
+                        'operational_tables_updated': False,
+                    },
+                    request=request,
+                )
+            return
+
+        return super().save_formset(request, form, formset, change)
 
     @staticmethod
     def _require_permission(request, permission):
@@ -141,7 +640,7 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
                 'validated_by', 'validated_at', 'validation_summary_display', 'error_message',
             )}),
         ]
-        if obj.file_type == 'FUEL':
+        if obj.file_type in {'FUEL', 'SUBURBS'}:
             fieldsets.append(
                 ('Activation and rollback', {'fields': (
                     'imported_by', 'last_imported_at', 'activated_by', 'activated_at',
@@ -175,10 +674,18 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
         summary = obj.validation_summary or {}
         if not summary:
             return format_html('<span class="help">No validation summary is available.</span>')
+
+        if obj.file_type == 'FUEL':
+            return self._fuel_validation_summary(obj, summary)
+        if obj.file_type == 'SUBURBS':
+            return self._postcodes_validation_summary(obj, summary)
         if obj.file_type in REFERENCE_FILE_TYPES:
             return self._reference_validation_summary(obj, summary)
-        return self._fuel_validation_summary(obj, summary)
 
+        return format_html(
+            '<pre style="white-space:pre-wrap">{}</pre>',
+            json.dumps(summary, indent=2),
+        )
     def _reference_validation_summary(self, obj, summary):
         errors = self._normalise_summary_messages(summary.get('errors'))
         warnings = self._normalise_summary_messages(summary.get('warnings'))
@@ -217,6 +724,105 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
             context,
         ))
 
+    def _postcodes_validation_summary(self, obj, summary):
+        errors = self._normalise_summary_messages(summary.get('errors'))
+        warnings = self._normalise_summary_messages(summary.get('warnings'))
+
+        new_rows = (
+            summary.get('new_rows_preview')
+            or summary.get('would_add_preview')
+            or []
+        )
+        excluded_rows = summary.get('excluded_rows') or []
+
+        if errors:
+            status_label = 'Validation failed'
+            status_class = 'sth-status-error'
+        elif warnings:
+            status_label = 'Validated with warnings'
+            status_class = 'sth-status-warning'
+        else:
+            status_label = 'Validated'
+            status_class = 'sth-status-success'
+
+        possible_alias_count = sum(
+            1 for row in new_rows if row.get('possible_alias')
+        )
+
+        sha256 = obj.sha256 or ''
+        sha256_short = (
+            f'{sha256[:8]}...{sha256[-6:]}'
+            if len(sha256) > 16
+            else (sha256 or '-')
+        )
+
+        import_summary = obj.import_summary or {}
+
+        context = {
+            'summary': summary,
+            'status_label': status_label,
+            'status_class': status_class,
+            'source_format': summary.get('source_format') or 'FTP_POSTCODES',
+            'rows_read': int(summary.get('rows_read') or 0),
+            'candidate_rows': int(summary.get('candidate_rows') or 0),
+            'existing_confirmed': int(
+                summary.get('existing_confirmed_in_current_source') or 0
+            ),
+            'new_rows_count': int(
+                summary.get('new_rows_to_add') or len(new_rows) or 0
+            ),
+            'existing_preserved': int(
+                summary.get('existing_not_in_current_source_preserved') or 0
+            ),
+            'excluded_rows_count': int(
+                summary.get('excluded_rows_count') or len(excluded_rows) or 0
+            ),
+            'possible_alias_count': possible_alias_count,
+            'multi_postcode_groups': int(
+                summary.get('multi_postcode_suburb_state_groups') or 0
+            ),
+            'new_rows': new_rows,
+            'excluded_rows': excluded_rows,
+            'warnings': warnings,
+            'errors': errors,
+            'activation_policy': summary.get('activation_policy') or '-',
+            'existing_action': summary.get('existing_action') or '-',
+            'new_action': summary.get('new_action') or '-',
+            'not_in_source_action': summary.get('not_in_source_action') or '-',
+            'freightzone_required_for_add': bool(
+                summary.get('freightzone_required_for_add')
+            ),
+            'sha256': sha256,
+            'sha256_short': sha256_short,
+            'original_filename': obj.original_filename or '-',
+            'source_method': obj.source_method or '-',
+            'raw_json': json.dumps(
+                summary,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            'import_summary': import_summary,
+            'created_count': int(import_summary.get('created_count') or 0),
+            'updated_count': int(import_summary.get('updated_count') or 0),
+            'deleted_count': int(import_summary.get('deleted_count') or 0),
+            'renamed_count': int(import_summary.get('renamed_count') or 0),
+            'import_activation_policy': (
+                import_summary.get('activation_policy') or '-'
+            ),
+            'created_rows_origin': import_summary.get('created_rows_origin') or '',
+            'raw_import_json': json.dumps(
+                import_summary,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+        }
+
+        return mark_safe(render_to_string(
+            'admin/imports/externaldatafile/postcodes_validation_summary.html',
+            context,
+        ))
     def _fuel_validation_summary(self, obj, summary):
         preview_rows = []
         for item in summary.get('preview') or []:
@@ -302,11 +908,32 @@ class ExternalDataFileAdmin(admin.ModelAdmin):
 
     @admin.display(description='Import summary')
     def import_summary_display(self, obj):
+        summary = obj.import_summary or {}
+        if not summary:
+            return format_html('<span class="help">No import summary is available.</span>')
+
+        if obj.file_type == 'SUBURBS':
+            return format_html(
+                '<table style="border-collapse:collapse">'
+                '<tr><th style="text-align:left;padding:4px 12px 4px 0">Created</th><td>{}</td></tr>'
+                '<tr><th style="text-align:left;padding:4px 12px 4px 0">Updated</th><td>{}</td></tr>'
+                '<tr><th style="text-align:left;padding:4px 12px 4px 0">Deleted</th><td>{}</td></tr>'
+                '<tr><th style="text-align:left;padding:4px 12px 4px 0">Renamed</th><td>{}</td></tr>'
+                '<tr><th style="text-align:left;padding:4px 12px 4px 0">Policy</th><td><code>{}</code></td></tr>'
+                '<tr><th style="text-align:left;padding:4px 12px 4px 0">Created row origin</th><td><code>{}</code></td></tr>'
+                '</table>',
+                summary.get('created_count', 0),
+                summary.get('updated_count', 0),
+                summary.get('deleted_count', 0),
+                summary.get('renamed_count', 0),
+                summary.get('activation_policy', '-'),
+                summary.get('created_rows_origin', '-'),
+            )
+
         return format_html(
             '<pre style="white-space:pre-wrap">{}</pre>',
-            json.dumps(obj.import_summary, indent=2),
+            json.dumps(summary, indent=2),
         )
-
     @admin.display(description='Operations')
     def operation_links(self, obj):
         links = []
